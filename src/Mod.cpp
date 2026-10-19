@@ -20,7 +20,9 @@
 #include "env/Regional.h"
 #include "env/Shelter.h"
 #include "env/Wind.h"
+#include "fog/Field.h"
 #include "fog/Fog.h"
+#include "fog/FogSettings.h"
 #include "imgui.h"
 #include "sky/Bodies.h"
 #include "sky/BodyTables.h"
@@ -166,6 +168,7 @@ namespace {
             if (!cfg.enabled.Get() || !snap.inWorld) {
                 if (m_envRunning) {
                     ia::fog::Stop();
+                    ia::fog::Reset();
                     ia::fields::Reset();
                     ia::regional::Reset();
                     ia::shelter::Clear();
@@ -181,7 +184,9 @@ namespace {
             ia::wind::Update(dt, snap);
             ia::regional::Update(dt, snap);
             ia::fields::Update(dt, snap);
+            ia::fogsettings::Update();
             ia::fog::Update(dt, snap);
+            ia::fog::Draw(snap);
         }
 
         struct OnUpdate {

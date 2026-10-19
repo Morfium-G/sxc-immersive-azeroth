@@ -1,44 +1,34 @@
 #include "fog/Fog.h"
 
-#include <algorithm>
+#include <chrono>
 #include <cmath>
-#include <cstdlib>
-#include <limits>
+#include <unordered_map>
 #include <vector>
 #include "SXC/Api/sxc_fog.h"
 #include "env/Wind.h"
+#include "fog/Field.h"
+#include "fog/FogSettings.h"
 #include "wxl/sdk.hpp"
 
 namespace ia::fog {
     namespace {
-        constexpr int kSize = 128;     // cells per side
-        constexpr float kCell = 2.0f;  // yd: +-128 yd
-        constexpr int kRecentre = 8;   // cells the player moves before the grid follows
-        constexpr float kDensity = 0.08f; // extinction per yd of full test fog
-        constexpr float kStep = 0.25f; // seconds between steps (burn-off, upload)
-
-        struct Cell {
-            int i = std::numeric_limits<int>::min(), j = 0; // the world cell this slot holds
-            float amount = 0.0f;       // 0..1
-            float thickness = 4.0f;    // yd
-            bool pool = false;
-            float poolTop = 0.0f;      // world z
-            bool groundKnown = false;
-            float ground = 0.0f;       // world z: the terrain or the water on it, whichever is higher
-        };
+        constexpr int N = kGridSize;
+        constexpr double kColourRefreshMs = 500.0; // the stock colour follows the time of day: colours again at most this often
 
         Look g_look;
-        std::vector<Cell> g_cells(kSize * kSize);
-        std::vector<float> g_light(kSize * kSize * 4), g_pool(kSize * kSize * 4);
-        int g_firstI = 0, g_firstJ = 0;
-        bool g_haveGrid = false;
-        int g_map = -1;
-        float g_burnOff = 120.0f;
-        float g_stepTime = 0.0f;
-        bool g_dirty = true;
+        std::vector<float> g_light(N * N * 4), g_pool(N * N * 4), g_tint(N * N * 4);
+        std::vector<float> g_base(N * N), g_cellRgb(N * N * 3);
+        std::vector<uint8_t> g_cellHas(N * N);
+        uint32_t g_sentVersion = ~0u;
+        double g_lastColours = 0.0;
         bool g_sentEmpty = false;
-        unsigned g_withFog = 0;
+        unsigned g_uploads = 0;
         float g_player[3] = {};
+
+        double NowMs() {
+            using namespace std::chrono;
+            return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
+        }
 
         const sxc_fog_api* Api() {
             static const sxc_fog_api* s_api =
@@ -46,232 +36,265 @@ namespace ia::fog {
             return s_api;
         }
 
-        int Mod(int v) {
-            const int m = v % kSize;
-            return m < 0 ? m + kSize : m;
+        int Wrap(int v) {
+            const int m = v % N;
+            return m < 0 ? m + N : m;
         }
 
-        int FloorCell(float v) { return static_cast<int>(std::floor(v / kCell)); }
+        float Luminance(const float c[3]) { return 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2]; }
 
-        // The cell for world cell (i, j), reset when its slot held another place.
-        Cell& At(int i, int j) {
-            Cell& c = g_cells[Mod(j) * kSize + Mod(i)];
+        // A kind's colour at a place (kind -1: the "all kinds" colour): the stock fog colour (it follows
+        // the time of day), changed by the place's FogSettings. Hue mode keeps the stock colour's
+        // brightness with Color's hue and saturation, so day and night still show.
+        void FogColour(int kind, uint32_t area, int map, const float stock[3], float out[3]) {
+            const fogsettings::Values& v = fogsettings::Resolve(area, map, kind);
+            float c[3] = { stock[0], stock[1], stock[2] };
 
-            if (c.i != i || c.j != j) {
-                c = Cell{};
-                c.i = i;
-                c.j = j;
+            if (v.colorMode == fogsettings::kColorReplace) {
+                for (int i = 0; i < 3; i++) c[i] = v.color[i];
+            } else if (v.colorMode == fogsettings::kColorHue) {
+                const float wanted = Luminance(v.color);
+                const float scale = wanted > 1.0e-4f ? Luminance(stock) / wanted : 0.0f;
+
+                for (int i = 0; i < 3; i++) c[i] = v.color[i] * scale;
             }
 
-            return c;
+            const float grey = Luminance(c);
+
+            for (int i = 0; i < 3; i++) {
+                out[i] = (grey + (c[i] - grey) * v.saturation) * v.brightness;
+            }
         }
 
-        bool InGrid(int i, int j) {
-            return i >= g_firstI && i < g_firstI + kSize && j >= g_firstJ && j < g_firstJ + kSize;
-        }
+        struct PlaceColours {
+            float kind[kKindCount][3];
+        };
 
-        // The surface fog lies on: the terrain, or the water over it.
-        void Ground(Cell& c) {
-            if (c.groundKnown) {
-                return;
+        // The field into the client's three layers.
+        void Build(const world::Snapshot& snap) {
+            const Grid& grid = Current();
+            float stock[3] = { 0.6f, 0.6f, 0.65f };
+            Api()->stock_colour(stock);
+            float placeColour[3];
+            const uint32_t playerArea = snap.areaCount > 0 ? snap.areaChain[0] : 0;
+            FogColour(-1, playerArea, snap.mapId, stock, placeColour);
+
+            // Each place's kind colours, once per place per build (area 0: the player's place).
+            std::unordered_map<uint32_t, PlaceColours> places;
+
+            auto coloursOf = [&](uint32_t area) -> const PlaceColours& {
+                auto found = places.find(area);
+
+                if (found != places.end()) {
+                    return found->second;
+                }
+
+                PlaceColours pc;
+
+                for (int k = 0; k < kKindCount; k++) {
+                    FogColour(k, area ? area : playerArea, snap.mapId, stock, pc.kind[k]);
+                }
+
+                return places.emplace(area, pc).first->second;
+            };
+
+            // Where the light layer starts: the lowest known ground within floorReach cells, so it
+            // doesn't drape up walls.
+            const int reach = g_look.floorReach < 0 ? 0 : (g_look.floorReach > 4 ? 4 : g_look.floorReach);
+
+            for (int r = 0; r < N; r++) {
+                for (int c = 0; c < N; c++) {
+                    const int index = r * N + c;
+                    float low = grid.ground[index];
+
+                    for (int dr = -reach; dr <= reach; dr++) {
+                        for (int dc = -reach; dc <= reach; dc++) {
+                            const int n = Wrap(r + dr) * N + Wrap(c + dc);
+
+                            if (grid.groundKnown[n] && grid.ground[n] < low) {
+                                low = grid.ground[n];
+                            }
+                        }
+                    }
+
+                    g_base[index] = low;
+                }
             }
 
-            const float x = (c.i + 0.5f) * kCell, y = (c.j + 0.5f) * kCell;
-            float z = 0.0f, water = 0.0f;
-            uint32_t liquid = 0;
+            for (int index = 0; index < N * N; index++) {
+                float density = 0.0f, weighted = 0.0f, patchy = 0.0f, floorSum = 0.0f;
+                float pool = 0.0f, poolDensity = 0.0f, poolWeight = 0.0f;
+                float mix[3] = {}, mixWeight = 0.0f;
+                const uint32_t area = grid.area[index];
+                PlaceColours colours = coloursOf(area);
+                uint32_t otherArea = 0;
+                const float otherShare = BlendOf(index, otherArea);
 
-            if (!terrain::HeightAt(x, y, z)) {
-                c.ground = g_player[2] - 1.0f; // a hole or not loaded: the player's ground, asked again later
-                return;
-            }
+                // The place's colours, blended toward the other place around like its settings.
+                if (otherShare > 0.0f && otherArea != area) {
+                    const PlaceColours& other = coloursOf(otherArea);
 
-            if (terrain::LiquidAt(x, y, water, liquid) && water > z) {
-                z = water;
-            }
+                    for (int k = 0; k < kKindCount; k++) {
+                        for (int ch = 0; ch < 3; ch++) {
+                            colours.kind[k][ch] += (other.kind[k][ch] - colours.kind[k][ch]) * otherShare;
+                        }
+                    }
+                }
 
-            c.ground = z;
-            c.groundKnown = true;
-        }
+                for (int k = 0; k < kKindCount; k++) {
+                    const KindSettings ks = SettingsAt(k, index);
 
-        void Step(float dt) {
-            const float keep = g_burnOff > 0.0f ? std::exp2(-dt / g_burnOff) : 1.0f;
-            unsigned withFog = 0;
-
-            for (int b = 0; b < kSize; b++) {
-                for (int a = 0; a < kSize; a++) {
-                    const int i = g_firstI + a, j = g_firstJ + b;
-                    const int s = Mod(j) * kSize + Mod(i);
-                    Cell& c = g_cells[s];
-                    float* light = &g_light[s * 4];
-                    float* pool = &g_pool[s * 4];
-                    light[0] = light[1] = light[2] = light[3] = 0.0f;
-                    pool[0] = pool[1] = pool[2] = pool[3] = 0.0f;
-
-                    if (c.i != i || c.j != j || c.amount <= 0.0f) {
+                    if (!Settings(k).enabled) {
                         continue;
                     }
 
-                    c.amount *= keep;
+                    const float a = grid.amount[k][index];
+                    const float heavy = grid.pool[k][index];
+                    const float lightShare = 1.0f - HeavyShare(k, index);
+                    const float d = a * ks.density * lightShare;
+                    density += d;
+                    weighted += d * ks.thickness;
+                    patchy += d * ks.patchiness;
+                    // Water fog and steam start at the height they came from, never above the ground here.
+                    const float kindFloor = grid.floor[k] ? std::fmin(grid.floor[k][index], grid.ground[index]) : g_base[index];
+                    floorSum += d * kindFloor;
+                    pool += heavy * ks.thickness;
+                    poolDensity += heavy * ks.density;
+                    poolWeight += heavy;
+                    const float share = (a * lightShare + heavy) * ks.density;
 
-                    if (c.amount < 0.002f) {
-                        c.amount = 0.0f;
-                        continue;
+                    for (int ch = 0; ch < 3; ch++) {
+                        mix[ch] += share * colours.kind[k][ch];
                     }
 
-                    Ground(c);
-                    withFog++;
+                    mixWeight += share;
+                }
 
-                    if (c.pool) {
-                        pool[0] = kDensity * c.amount;
-                        pool[1] = c.poolTop;
-                        pool[2] = 0.6f * c.thickness * c.amount + 0.1f;
-                    } else {
-                        light[0] = kDensity * c.amount;
-                        light[1] = c.ground;
-                        light[2] = c.thickness * (0.4f + 0.6f * c.amount);
-                        light[3] = 1.0f;
+                const bool blocked = grid.block[index] == 3;
+                const bool unready = !grid.groundKnown[index] || grid.fresh[index];
+                float* light = &g_light[index * 4];
+                float* heavy = &g_pool[index * 4];
+                light[0] = blocked || unready ? 0.0f : density;
+                light[1] = density > 0.0f ? floorSum / density : g_base[index];
+                light[2] = density > 0.0f ? weighted / density : 1.0f;
+                light[3] = density > 0.0f ? patchy / density : 0.0f;
+                const bool pooled = !blocked && !unready && pool >= 0.02f && poolWeight > 0.0f;
+                heavy[0] = pooled ? poolDensity / poolWeight : 0.0f;
+                heavy[1] = grid.ground[index] + pool;
+                heavy[2] = std::fmin(std::fmax(pool * g_look.poolSoftness, 0.3f), 2.0f);
+                heavy[3] = 0.0f;
+                g_cellHas[index] = mixWeight > 0.0f ? 1 : 0;
+
+                for (int ch = 0; ch < 3; ch++) {
+                    g_cellRgb[index * 3 + ch] = mixWeight > 0.0f ? mix[ch] / mixWeight : placeColour[ch];
+                }
+            }
+
+            // Cells without fog take a fog-bearing neighbour's colour (else the place's): the density
+            // fades into them by the texture filter, and with the place's colour every patch got a rim
+            // in it (WXL: red around white steam in Burning Steppes).
+            for (int r = 0; r < N; r++) {
+                for (int c = 0; c < N; c++) {
+                    const int index = r * N + c;
+                    const float* rgb = &g_cellRgb[index * 3];
+
+                    for (int dr = -1; dr <= 1 && !g_cellHas[index]; dr++) {
+                        for (int dc = -1; dc <= 1; dc++) {
+                            const int n = Wrap(r + dr) * N + Wrap(c + dc);
+
+                            if (g_cellHas[n]) {
+                                rgb = &g_cellRgb[n * 3];
+                                dr = 2;
+                                break;
+                            }
+                        }
                     }
+
+                    for (int ch = 0; ch < 3; ch++) {
+                        g_tint[index * 4 + ch] = rgb[ch];
+                    }
+
+                    g_tint[index * 4 + 3] = 0.0f;
+                }
+            }
+        }
+
+        bool AnyFog() {
+            const Grid& grid = Current();
+
+            for (int k = 0; k < kKindCount; k++) {
+                if (grid.maxAmount[k] > 0.0f || (grid.pool[k] && GetStats().cellsWithFog[k] > 0)) {
+                    return true;
                 }
             }
 
-            g_withFog = withFog;
-            g_dirty = g_dirty || withFog > 0;
-        }
-
-        void Send() {
-            const sxc_fog_api* api = Api();
-
-            if (!api) {
-                return;
-            }
-
-            // The field: only while there's fog (and once more when it's gone).
-            if (g_dirty && (g_withFog > 0 || !g_sentEmpty)) {
-                sxc_fog_field field = {};
-                field.struct_size = sizeof(field);
-                field.size = kSize;
-                field.cell_size = kCell;
-                field.first_i = g_firstI;
-                field.first_j = g_firstJ;
-                field.light = g_light.data();
-                field.pool = g_pool.data();
-                api->set_field(g_withFog > 0 ? &field : nullptr);
-                g_sentEmpty = g_withFog == 0;
-            }
-
-            g_dirty = false;
-
-            // The look, every frame. The patches drift with the steady wind (not the gusts: they'd
-            // shake the whole pattern); the client sums the drift up frame by frame.
-            const float bearing = wind::BearingDegrees() * 3.14159265f / 180.0f;
-            const float steady = wind::SteadyGround();
-            sxc_fog_look look = {};
-            look.struct_size = sizeof(look);
-            look.enabled = g_look.enabled ? WXL_TRUE : WXL_FALSE;
-            look.colour_mode = g_look.colourMode;
-            look.colour[0] = g_look.colour[0];
-            look.colour[1] = g_look.colour[1];
-            look.colour[2] = g_look.colour[2];
-            look.brightness = g_look.brightness;
-            look.density_scale = g_look.densityScale;
-            look.noise_amount = g_look.noiseAmount;
-            look.noise_tile = g_look.noiseTile;
-            const float speed = 3.0f * steady * g_look.drift; // yd per second
-            look.drift[0] = std::cos(bearing) * speed;        // bearing clockwise from north (+x): east is -y
-            look.drift[1] = -std::sin(bearing) * speed;
-            look.far_distance = g_look.farDistance;
-            look.haze_density = g_look.hazeDensity;
-            look.haze_base = g_player[2] - 2.0f;
-            look.haze_thickness = g_look.hazeThickness;
-            look.debug = g_look.debug ? 1 : 0;
-            api->set_look(&look);
+            return false;
         }
     }
 
-    Look& Settings() { return g_look; }
-    float& BurnOffSeconds() { return g_burnOff; }
+    Look& LookSettings() { return g_look; }
 
-    void Deposit(float amount, float radius, float thickness, bool pool) {
-        if (!g_haveGrid || radius <= 0.0f) {
-            return;
-        }
+    void Draw(const world::Snapshot& snap) {
+        const sxc_fog_api* api = Api();
 
-        // A pool is flat: its top over the lowest ground under the deposit's middle.
-        const int pi = FloorCell(g_player[0]), pj = FloorCell(g_player[1]);
-        Cell& centre = At(pi, pj);
-        Ground(centre);
-        const float top = centre.ground + thickness;
-        const int reach = static_cast<int>(std::ceil(radius / kCell));
-
-        for (int dj = -reach; dj <= reach; dj++) {
-            for (int di = -reach; di <= reach; di++) {
-                const int i = pi + di, j = pj + dj;
-
-                if (!InGrid(i, j)) {
-                    continue;
-                }
-
-                const float d = std::sqrt(static_cast<float>(di * di + dj * dj)) * kCell / radius;
-
-                if (d >= 1.0f) {
-                    continue;
-                }
-
-                const float t = 1.0f - d;
-                Cell& c = At(i, j);
-                c.amount = std::min(1.0f, c.amount + amount * t * t * (3.0f - 2.0f * t));
-                c.thickness = thickness;
-                c.pool = pool;
-                c.poolTop = top;
-            }
-        }
-
-        g_dirty = true;
-        Step(0.0f);
-    }
-
-    void Clear() {
-        for (Cell& c : g_cells) {
-            c.amount = 0.0f;
-        }
-
-        g_dirty = true;
-        Step(0.0f);
-    }
-
-    void Update(float dt, const world::Snapshot& snap) {
-        if (!snap.inWorld) {
+        if (!api || !snap.inWorld) {
             return;
         }
 
         g_player[0] = snap.playerPos[0];
         g_player[1] = snap.playerPos[1];
         g_player[2] = snap.playerPos[2];
+        const Grid& grid = Current();
 
-        if (snap.mapId != g_map) {
-            std::fill(g_cells.begin(), g_cells.end(), Cell{});
-            g_map = snap.mapId;
-            g_haveGrid = false;
-            g_dirty = true;
+        // The field: when it changed, and the colours twice a second (they follow the time of day).
+        if (grid.ground && grid.amount[0]) {
+            const bool any = AnyFog();
+            const double now = NowMs();
+
+            if (any && (grid.version != g_sentVersion || now - g_lastColours > kColourRefreshMs)) {
+                Build(snap);
+                sxc_fog_field field = {};
+                field.struct_size = sizeof(field);
+                field.size = N;
+                field.cell_size = kCellSize;
+                field.first_i = grid.firstI;
+                field.first_j = grid.firstJ;
+                field.light = g_light.data();
+                field.pool = g_pool.data();
+                field.colour = g_tint.data();
+                api->set_field(&field);
+                g_sentVersion = grid.version;
+                g_lastColours = now;
+                g_sentEmpty = false;
+                g_uploads++;
+            } else if (!any && !g_sentEmpty) {
+                api->set_field(nullptr);
+                g_sentEmpty = true;
+            }
         }
 
-        const int fi = FloorCell(snap.playerPos[0]) - kSize / 2, fj = FloorCell(snap.playerPos[1]) - kSize / 2;
-
-        if (!g_haveGrid || std::abs(fi - g_firstI) >= kRecentre || std::abs(fj - g_firstJ) >= kRecentre) {
-            g_firstI = fi;
-            g_firstJ = fj;
-            g_haveGrid = true;
-            g_dirty = true;
-        }
-
-        g_stepTime += dt;
-
-        if (g_stepTime >= kStep) {
-            Step(g_stepTime);
-            g_stepTime = 0.0f;
-        }
-
-        Send();
+        // The look, every frame. The patches drift with the steady wind (the client sums the drift).
+        const float bearing = wind::BearingDegrees() * 3.14159265f / 180.0f;
+        const float speed = 3.0f * wind::SteadyGround() * g_look.drift; // yd per second
+        sxc_fog_look look = {};
+        look.struct_size = sizeof(look);
+        look.enabled = g_look.enabled ? WXL_TRUE : WXL_FALSE;
+        look.colour_mode = 0; // the extra haze: the place's stock colour
+        look.brightness = g_look.brightness;
+        look.density_scale = g_look.densityScale;
+        look.noise_amount = g_look.noiseAmount;
+        look.noise_tile = g_look.noiseTile;
+        look.drift[0] = std::cos(bearing) * speed; // bearing clockwise from north (+x): east is -y
+        look.drift[1] = -std::sin(bearing) * speed;
+        look.far_distance = g_look.farDistance;
+        look.haze_density = g_look.hazeDensity;
+        look.haze_base = g_player[2] - 2.0f;
+        look.haze_thickness = g_look.hazeThickness;
+        look.debug = g_look.debug ? 1 : 0;
+        look.step_length = g_look.stepLength;
+        look.method = g_look.froxels ? 1 : 0;
+        look.max_steps = g_look.maxSteps;
+        api->set_look(&look);
     }
 
     void Stop() {
@@ -283,10 +306,8 @@ namespace ia::fog {
             api->set_field(nullptr);
         }
 
-        std::fill(g_cells.begin(), g_cells.end(), Cell{});
-        g_haveGrid = false;
-        g_withFog = 0;
         g_sentEmpty = true;
+        g_sentVersion = ~0u;
     }
 
     bool Available() {
@@ -297,5 +318,5 @@ namespace ia::fog {
         return Api() ? Api()->status() : "the client has no sxc.fog (an older client)";
     }
 
-    unsigned CellsWithFog() { return g_withFog; }
+    unsigned Uploads() { return g_uploads; }
 }

@@ -1,43 +1,39 @@
-// The fog, as the client draws it (sxc.fog: a froxel volume, Vulkan only). For now a test field: fog
-// deposited around the player from the Fog panel, burning off by a half-life, lying on the ground (or
-// on water), plus a haze. WXL's fog field (the kinds and their rules, FogSettings) moves in next and
-// feeds the same field.
+// The fog as the client draws it (sxc.fog: a froxel volume, Vulkan only), fed from the fog field
+// (fog/Field): per cell, every kind's light layer (density, floor, thickness, patchiness) and heavy pool
+// (a flat top over the ground), coloured by the kinds' colours (FogSettings' colour columns over the
+// place's stock fog colour). WXL's renderer (features/GroundFog) built its textures the same way.
 #pragma once
 
-#include <cstdint>
 #include "World.h"
 
 namespace ia::fog {
-    // The look (the panel; not saved yet).
+    // The look (the panel; not saved).
     struct Look {
         bool enabled = true;
         bool debug = false;          // magenta
-        int colourMode = 0;          // 0 the place's stock fog colour, 1 own
-        float colour[3] = { 0.75f, 0.78f, 0.82f };
-        float brightness = 1.0f;
+        float brightness = 1.0f;     // x every colour
         float densityScale = 1.0f;
-        float noiseAmount = 0.6f;
+        float noiseAmount = 0.6f;    // x the kinds' patchiness
         float noiseTile = 64.0f;     // yd
         float drift = 1.0f;          // x the wind
         float farDistance = 250.0f;  // yd
-        float hazeDensity = 0.0f;    // per yd at the ground (0.002 = a light haze)
+        float poolSoftness = 0.6f;   // the pools' soft top, share of their depth
+        int floorReach = 2;          // cells: the light layer starts on the lowest ground this far around
+        float hazeDensity = 0.0f;    // an extra haze everywhere (per yd at the ground; the haze kind is in the field)
         float hazeThickness = 30.0f; // yd
+        float stepLength = 0.5f;     // yd: the step near the camera (smaller: smoother thin layers, more GPU)
+        bool froxels = false;        // the froxel volume instead of a march per pixel (cheaper, coarse)
+        int maxSteps = 160;          // per pixel: the most steps a ray takes
     };
-    Look& Settings();
+    Look& LookSettings();
 
-    // Testing: fog around the player. `amount` 0..1 at the centre, fading to 0 at `radius` yd; as a
-    // layer `thickness` yd high, or as a flat pool `thickness` yd deep.
-    void Deposit(float amount, float radius, float thickness, bool pool);
-    void Clear();
-    float& BurnOffSeconds(); // the half-life the test fog burns off with (0 = it stays)
+    // Once per frame, after fog::Update (the field).
+    void Draw(const world::Snapshot& snap);
 
-    // Once per frame, after the world snapshot and the wind.
-    void Update(float dt, const world::Snapshot& snap);
-
-    // The mod is off or the world was left: the client stops drawing it (the test fog is forgotten).
+    // The mod is off or the world was left: the client stops drawing it.
     void Stop();
 
-    bool Available();      // the client draws volumetric fog (Vulkan)
-    const char* Status();  // what it did last frame, or why not
-    unsigned CellsWithFog();
+    bool Available();     // the client draws volumetric fog (Vulkan)
+    const char* Status(); // what it did last frame, or why not
+    unsigned Uploads();
 }

@@ -1,42 +1,250 @@
 #include "ui/Panels.h"
 
+#include <cstdio>
 #include "World.h"
+#include "fog/Field.h"
 #include "fog/Fog.h"
+#include "fog/FogSettings.h"
 #include "imgui.h"
 
 namespace ia::ui {
     namespace {
+        int g_depositKind = fog::kMist;
         float g_amount = 1.0f;
         float g_radius = 40.0f;
-        float g_thickness = 4.0f;
-        bool g_pool = false;
+
+        void Kinds() {
+            const fog::Stats st = fog::GetStats();
+
+            if (!ImGui::BeginTable("##kinds", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+                return;
+            }
+
+            ImGui::TableSetupColumn("kind");
+            ImGui::TableSetupColumn("on");
+            ImGui::TableSetupColumn("here: amount / target");
+            ImGui::TableSetupColumn("pool");
+            ImGui::TableSetupColumn("cells");
+            ImGui::TableSetupColumn("progress");
+            ImGui::TableHeadersRow();
+
+            for (int k = 0; k < fog::kKindCount; k++) {
+                fog::KindSettings& s = fog::Settings(k);
+                const fog::Explanation& e = fog::Explain(k);
+                ImGui::PushID(k);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(fog::KindName(k));
+                ImGui::TableNextColumn();
+                ImGui::Checkbox("##on", &s.enabled);
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f / %.2f", e.amount, e.target);
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f", e.pool);
+                ImGui::TableNextColumn();
+                ImGui::Text("%u", st.cellsWithFog[k]);
+                ImGui::TableNextColumn();
+                ImGui::Text("%.0f%%", fog::Progress(k) * 100.0f);
+                ImGui::PopID();
+            }
+
+            ImGui::EndTable();
+        }
+
+        void Why() {
+            const fog::RulesInputs& in = fog::Inputs();
+
+            if (!in.valid) {
+                ImGui::TextDisabled("no rules step yet");
+                return;
+            }
+
+            ImGui::Text("air %.1f degC (an hour ago %.1f, cooling %.2f), water %.1f degC, humidity %.2f, fogginess %.2f", in.airNow, in.airHourAgo, in.cooling,
+                        in.water, in.humidity, in.fogginess);
+            ImGui::Text("night %.2f, wind %.2f, rain %.2f, snow %.2f", in.night, in.wind, in.rain, in.snow);
+
+            for (int k = 0; k < fog::kKindCount; k++) {
+                const fog::Explanation& e = fog::Explain(k);
+                char label[96];
+                std::snprintf(label, sizeof(label), "%s: target %.2f, amount %.2f (rules %+.4f /s, wind %+.4f /s)###why%d", fog::KindName(k), e.target, e.amount,
+                              e.rules, e.wind, k);
+
+                if (!ImGui::TreeNode(label)) {
+                    continue;
+                }
+
+                for (int f = 0; f < e.count; f++) {
+                    const fog::Factor& x = e.factors[f];
+
+                    if (x.factor < 0.0f) {
+                        ImGui::TextDisabled("%s: %.2f", x.name, x.input);
+                    } else {
+                        ImGui::Text("%s%s: %.2f -> x %.2f", x.alternative ? "(or) " : "", x.name, x.input, x.factor);
+                    }
+                }
+
+                ImGui::Text("slope %.0f deg, heavy share %.2f; pool %.2f heading to %.2f (rules %+.4f, wind %+.4f, flow %+.4f /s)", e.slopeDegrees, e.heavyShare,
+                            e.pool, e.poolTarget, e.poolRules, e.poolWind, e.poolFlow);
+                ImGui::TreePop();
+            }
+        }
+
+        void KindSettings() {
+            ImGui::TextDisabled("FogSettings.cdbc: %s. The values in effect where you stand; tick \"panel\" to try others (not saved).", fogsettings::Status());
+
+            for (int k = 0; k < fog::kKindCount; k++) {
+                fog::KindSettings& s = fog::Settings(k);
+                ImGui::PushID(100 + k);
+
+                if (ImGui::TreeNode(fog::KindName(k))) {
+                    ImGui::Checkbox("panel's values", &s.panelOverride);
+
+                    if (!s.panelOverride) {
+                        ImGui::BeginDisabled();
+                    }
+
+                    ImGui::SliderFloat("strength", &s.strength, 0.0f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("density (per yd)", &s.density, 0.0f, 0.3f, "%.3f");
+                    ImGui::SliderFloat("thickness (yd)", &s.thickness, 0.25f, 40.0f, "%.1f");
+                    ImGui::SliderFloat("build-up (s)", &s.buildUpSeconds, 1.0f, 3600.0f, "%.0f");
+                    ImGui::SliderFloat("burn-off (s)", &s.burnOffSeconds, 1.0f, 3600.0f, "%.0f");
+                    ImGui::SliderFloat("wind thins at", &s.windThin, 0.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("wind drift", &s.windDrift, 0.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("patchiness", &s.patchiness, 0.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("weight (heavy share)", &s.weight, 0.0f, 1.0f, "%.2f");
+
+                    if (!s.panelOverride) {
+                        ImGui::EndDisabled();
+                    }
+
+                    ImGui::TreePop();
+                }
+
+                ImGui::PopID();
+            }
+
+            fog::FieldSettings& f = fog::Field();
+            ImGui::SliderFloat("pools run downhill x", &f.poolSpeed, 0.0f, 4.0f, "%.2f");
+            ImGui::SliderFloat("steep from (deg)", &f.steepStart, 10.0f, 60.0f, "%.0f");
+            ImGui::SliderFloat("steep fully (deg)", &f.steepFull, 10.0f, 80.0f, "%.0f");
+            ImGui::Checkbox("blend the places' settings across borders", &f.blendPlaces);
+        }
+
+        void Zones() {
+            fog::ZoneState zones[32];
+            const unsigned n = fog::ZoneStates(zones, 32);
+
+            if (!ImGui::BeginTable("##fogzones", 1 + fog::kKindCount, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+                return;
+            }
+
+            ImGui::TableSetupColumn("zone");
+
+            for (int k = 0; k < fog::kKindCount; k++) {
+                ImGui::TableSetupColumn(fog::KindName(k));
+            }
+
+            ImGui::TableHeadersRow();
+
+            for (unsigned z = 0; z < n; z++) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%u %s%s", zones[z].zone, world::AreaName(zones[z].zone), zones[z].inRange ? "" : " (away)");
+
+                for (int k = 0; k < fog::kKindCount; k++) {
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f / %.2f", zones[z].amount[k], zones[z].target[k]);
+                }
+            }
+
+            ImGui::EndTable();
+        }
+
+        void Look() {
+            fog::Look& look = fog::LookSettings();
+            ImGui::SliderFloat("density x", &look.densityScale, 0.0f, 5.0f, "%.2f");
+            ImGui::SliderFloat("brightness", &look.brightness, 0.0f, 3.0f, "%.2f");
+            ImGui::SliderFloat("patchiness x", &look.noiseAmount, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("patch size (yd per tile)", &look.noiseTile, 8.0f, 256.0f, "%.0f");
+            ImGui::SliderFloat("drift with the wind x", &look.drift, 0.0f, 4.0f, "%.2f");
+            ImGui::SliderFloat("pools' soft top", &look.poolSoftness, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderInt("floor reach (cells)", &look.floorReach, 0, 4);
+            ImGui::SetItemTooltip("The light layer starts on the lowest ground this many cells around, so it doesn't drape up walls.");
+            ImGui::SliderFloat("reach (yd)", &look.farDistance, 50.0f, 800.0f, "%.0f");
+            ImGui::SetItemTooltip("How far the volume reaches; the sky gets this much fog too.");
+            ImGui::SliderFloat("extra haze (per yd)", &look.hazeDensity, 0.0f, 0.02f, "%.4f");
+            ImGui::SetItemTooltip("Everywhere, on top of the fog kinds (testing). The haze kind itself comes with rain.");
+            ImGui::SliderFloat("extra haze height (yd)", &look.hazeThickness, 5.0f, 200.0f, "%.0f");
+        }
     }
 
     void DrawFog(void*) {
         if (!fog::Available()) {
             ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s", fog::Status());
-            ImGui::TextDisabled("Volumetric fog needs the Vulkan renderer (-vulkan). D3D9 keeps the client's own fog.");
-            return;
+            ImGui::TextDisabled("Volumetric fog needs the Vulkan renderer (-vulkan). D3D9 keeps the client's own fog. The field runs anyway.");
+        } else {
+            ImGui::TextDisabled("%s", fog::Status());
         }
 
-        ImGui::TextDisabled("%s", fog::Status());
-        fog::Look& look = fog::Settings();
+        fog::Look& look = fog::LookSettings();
         ImGui::Checkbox("Draw the fog", &look.enabled);
         ImGui::SameLine();
         ImGui::Checkbox("magenta (where is it?)", &look.debug);
+        ImGui::SetNextItemWidth(160.0f);
+        ImGui::SliderFloat("fog step (yd)", &look.stepLength, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+        ImGui::SetItemTooltip("The quality: the fog is integrated in steps this long near you (growing with the distance). Smaller = smoother thin layers, more GPU time.");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120.0f);
+        ImGui::SliderInt("max steps", &look.maxSteps, 16, 512);
+        ImGui::SetItemTooltip("Per pixel: the most steps a ray takes. Rings far away: raise it; slow: lower it.");
+        ImGui::SameLine();
+        ImGui::Checkbox("froxels (cheap, coarse)", &look.froxels);
+        ImGui::SetItemTooltip("The froxel volume instead of marching every pixel: a fraction of the cost, but blocky on thin layers (to compare).");
+        const fog::Stats st = fog::GetStats();
+        ImGui::SameLine();
+        ImGui::TextDisabled("step %.2f ms (rules %.2f), %u uploads", st.tickMs, st.rulesMs, fog::Uploads());
 
-        ImGui::SeparatorText("Test fog");
-        ImGui::TextWrapped("Until the fog's rules are ported (mist at night, water fog, swamps...), fog comes from here: deposited around you, "
-                           "burning off by itself.");
-        ImGui::SliderFloat("amount", &g_amount, 0.05f, 1.0f, "%.2f");
-        ImGui::SliderFloat("radius (yd)", &g_radius, 4.0f, 120.0f, "%.0f");
-        ImGui::SliderFloat(g_pool ? "pool depth (yd)" : "layer height (yd)", &g_thickness, 0.5f, 20.0f, "%.1f");
-        ImGui::Checkbox("as a pool (flat top, fills hollows)", &g_pool);
+        Kinds();
 
-        if (ImGui::Button("Deposit")) {
-            fog::Deposit(g_amount, g_radius, g_thickness, g_pool);
+        if (ImGui::CollapsingHeader("Why (where you stand)", ImGuiTreeNodeFlags_DefaultOpen)) {
+            Why();
         }
 
+        if (ImGui::CollapsingHeader("The kinds' settings")) {
+            KindSettings();
+        }
+
+        if (ImGui::CollapsingHeader("Zones (typical fog, this session)")) {
+            Zones();
+        }
+
+        if (ImGui::CollapsingHeader("Look (not saved)")) {
+            Look();
+        }
+
+        ImGui::SeparatorText("Testing (not saved)");
+        static const char* const kKinds[] = { "mist", "water fog", "steam", "area fog", "haze" };
+        ImGui::SetNextItemWidth(110.0f);
+        ImGui::Combo("##kind", &g_depositKind, kKinds, IM_ARRAYSIZE(kKinds));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(90.0f);
+        ImGui::SliderFloat("##amount", &g_amount, 0.05f, 1.0f, "amount %.2f");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(110.0f);
+        ImGui::SliderFloat("##radius", &g_radius, 4.0f, 128.0f, "radius %.0f yd");
+        ImGui::SameLine();
+
+        if (ImGui::Button("Deposit")) {
+            fog::Deposit(g_depositKind, g_amount, g_radius);
+        }
+
+        ImGui::SetItemTooltip("Fog of this kind around you; it then burns off (or stays) by the kind's rules.");
+
+        if (ImGui::Button("Fast-forward")) {
+            fog::FastForward();
+        }
+
+        ImGui::SetItemTooltip("Every cell straight to its target, as if the conditions had held for a long time.");
         ImGui::SameLine();
 
         if (ImGui::Button("Clear")) {
@@ -44,29 +252,10 @@ namespace ia::ui {
         }
 
         ImGui::SameLine();
-        ImGui::Text("%u cells with fog", fog::CellsWithFog());
-        ImGui::SliderFloat("burns off in (s, half-life; 0 stays)", &fog::BurnOffSeconds(), 0.0f, 600.0f, "%.0f");
+        bool paused = fog::Paused();
 
-        ImGui::SeparatorText("Look (not saved)");
-        ImGui::SliderFloat("density x", &look.densityScale, 0.0f, 5.0f, "%.2f");
-        ImGui::SliderFloat("patchiness", &look.noiseAmount, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("patch size (yd per tile)", &look.noiseTile, 8.0f, 256.0f, "%.0f");
-        ImGui::SliderFloat("drift with the wind x", &look.drift, 0.0f, 4.0f, "%.2f");
-        ImGui::SliderFloat("reach (yd)", &look.farDistance, 50.0f, 800.0f, "%.0f");
-        ImGui::SetItemTooltip("How far the volume reaches; the sky gets this much fog too. Beyond it, the client's own distance fog.");
-
-        static const char* const kModes[] = { "the place's fog colour", "own colour" };
-        ImGui::Combo("colour", &look.colourMode, kModes, IM_ARRAYSIZE(kModes));
-
-        if (look.colourMode == 1) {
-            ImGui::ColorEdit3("##own", look.colour);
+        if (ImGui::Checkbox("pause", &paused)) {
+            fog::SetPaused(paused);
         }
-
-        ImGui::SliderFloat("brightness", &look.brightness, 0.0f, 3.0f, "%.2f");
-
-        ImGui::SeparatorText("Haze");
-        ImGui::SliderFloat("haze density (per yd)", &look.hazeDensity, 0.0f, 0.02f, "%.4f");
-        ImGui::SetItemTooltip("Everywhere, thinning upward from just below your feet. 0.002 is a light haze, 0.01 thick.");
-        ImGui::SliderFloat("haze height (yd)", &look.hazeThickness, 5.0f, 200.0f, "%.0f");
     }
 }
