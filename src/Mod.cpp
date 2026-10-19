@@ -2,7 +2,8 @@
 // covers, lights, wind) for our client, as a WarcraftXL mod over the client's sxc.* services.
 //
 // Now: its tables, the sky clock (debug override, pinned / shifted places, seasonal day length), the
-// sky bodies, the climate, Lua functions, and panels in the overlay.
+// sky bodies, the climate, wind and shelter, the ground materials, the zones' rain and snow, the world
+// fields near the player (moisture, temperature, snow), Lua functions, and panels in the overlay.
 
 #include <cstdio>
 #include <memory>
@@ -13,6 +14,12 @@
 #include "Tables.h"
 #include "World.h"
 #include "climate/Climate.h"
+#include "env/CoverTable.h"
+#include "env/Fields.h"
+#include "env/Materials.h"
+#include "env/Regional.h"
+#include "env/Shelter.h"
+#include "env/Wind.h"
 #include "imgui.h"
 #include "sky/Bodies.h"
 #include "sky/BodyTables.h"
@@ -44,7 +51,8 @@ namespace {
     };
 
     void DrawOverview(void*) {
-        ImGui::TextWrapped("Immersive Azeroth is being ported from WXL. Here now: the sky clock and bodies, the climate. Next: wind, fog, covers, lights, grass.");
+        ImGui::TextWrapped("Immersive Azeroth is being ported from WXL. Here now: the sky clock and bodies, the climate, wind, the world fields "
+                           "(moisture, temperature, snow) and the zones' weather memory. Next: fog, covers, lights, grass.");
         ImGui::SeparatorText("Tables");
 
         if (ImGui::BeginTable("##tables", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
@@ -123,6 +131,8 @@ namespace {
             sxc::ui::AddPanel(module, "Overview", DrawOverview);
             sxc::ui::AddPanel(module, "Sky", ia::ui::DrawSky);
             sxc::ui::AddPanel(module, "Climate", ia::ui::DrawClimate);
+            sxc::ui::AddPanel(module, "Wind", ia::ui::DrawWind);
+            sxc::ui::AddPanel(module, "Ground", ia::ui::DrawGround);
 
             char line[160];
             std::snprintf(line, sizeof(line), "ready: tables registered, sky provider %s, overlay module %s", ia::sky::Api() ? "set" : "unavailable",
@@ -148,6 +158,26 @@ namespace {
             ia::sky::ephemeris::Tick(dt);
             ia::climate::Update(snap);
             ia::sky::bodies::Update(snap);
+
+            // The environment: off with the mod, forgotten when the world is left (a new character,
+            // a logout: the zones' weather memory is per session).
+            if (!cfg.enabled.Get() || !snap.inWorld) {
+                if (m_envRunning) {
+                    ia::fields::Reset();
+                    ia::regional::Reset();
+                    ia::shelter::Clear();
+                    m_envRunning = false;
+                }
+
+                return;
+            }
+
+            m_envRunning = true;
+            ia::materials::Update();
+            ia::covertable::Update();
+            ia::wind::Update(dt, snap);
+            ia::regional::Update(dt, snap);
+            ia::fields::Update(dt, snap);
         }
 
         struct OnUpdate {
@@ -160,6 +190,7 @@ namespace {
         };
 
         bool m_ready = false;
+        bool m_envRunning = false;
         OnUpdate m_onUpdate{ this };
         OnScriptReady m_onScriptReady;
         wxl::Subscription m_update;

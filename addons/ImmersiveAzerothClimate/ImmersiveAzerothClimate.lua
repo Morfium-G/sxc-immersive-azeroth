@@ -38,7 +38,32 @@ frame:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
     GameTooltip:AddLine("Climate")
     if air then GameTooltip:AddDoubleLine("Air", string.format("%.1f\194\176C", air), 1, 1, 1, 1, 1, 1) end
+    if ground and air and math.abs(ground - air) >= 0.5 then
+        GameTooltip:AddDoubleLine("Ground", string.format("%.1f\194\176C", ground), 1, 1, 1, 1, 1, 1)
+    end
     GameTooltip:AddDoubleLine("Humidity", string.format("%d%%", (ImmersiveAzeroth_GetHumidity() or 0) * 100), 1, 1, 1, 1, 1, 1)
+    -- API version 2 and later: the ground's moisture, snow and the wind.
+    if ImmersiveAzeroth_GetGroundMoisture then
+        local moisture, rest = ImmersiveAzeroth_GetGroundMoisture()
+        if moisture then
+            local wet = moisture - rest
+            local word = wet > 0.4 and "soaked" or wet > 0.15 and "wet" or wet > 0.03 and "damp" or "as usual"
+            GameTooltip:AddDoubleLine("Soil", string.format("%s (%d%%)", word, moisture * 100), 1, 1, 1, 1, 1, 1)
+        end
+        local snow = ImmersiveAzeroth_GetField("snow")
+        if snow and snow >= 0.01 then
+            GameTooltip:AddDoubleLine("Snow", string.format("%d cm", snow * 91.44 + 0.5), 1, 1, 1, 1, 1, 1)
+        end
+    end
+    if ImmersiveAzeroth_GetWind then
+        local strength, bearing = ImmersiveAzeroth_GetWind()
+        if strength and strength >= 0.05 then
+            local DIRS = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" }
+            local from = DIRS[math.floor(((bearing + 180) % 360) / 45 + 0.5) % 8 + 1]
+            local word = strength > 0.75 and "stormy" or strength > 0.45 and "windy" or strength > 0.2 and "breezy" or "light air"
+            GameTooltip:AddDoubleLine("Wind", string.format("%s from the %s", word, from), 1, 1, 1, 1, 1, 1)
+        end
+    end
     if ImmersiveAzeroth_GetSkyTime then
         local hour, minute = ImmersiveAzeroth_GetSkyTime()
         GameTooltip:AddDoubleLine("Sky time", string.format("%02d:%02d", hour, minute), 1, 1, 1, 1, 1, 1)

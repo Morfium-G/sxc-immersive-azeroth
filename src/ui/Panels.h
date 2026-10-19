@@ -4,4 +4,6 @@
 namespace ia::ui {
     void DrawSky(void* user);
     void DrawClimate(void* user);
+    void DrawWind(void* user);
+    void DrawGround(void* user);
 }

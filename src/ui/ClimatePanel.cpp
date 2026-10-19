@@ -61,11 +61,18 @@ namespace ia::ui {
         bool changed = ImGui::Combo("weather", &g_weatherChoice, kChoices, IM_ARRAYSIZE(kChoices));
         changed |= ImGui::SliderFloat("intensity", &g_weatherIntensity, 0.0f, 1.0f, "%.2f");
 
-        if (changed) {
+        // The client shows the test weather itself (rain falls, the sky darkens), and the climate,
+        // wind and fields follow it like real weather. An older client can't: then only the climate
+        // sees it.
+        if (changed && !world::SetClientWeather(g_weatherChoice - 1, g_weatherIntensity)) {
             climate::SetWeatherOverride(g_weatherChoice - 1, g_weatherIntensity);
         }
 
-        ImGui::SetItemTooltip("Only what the climate sees; the client's weather stays.");
+        if (world::ClientWeatherTest() >= 0) {
+            ImGui::SetItemTooltip("The client shows this weather; the server's weather comes back with \"live weather\".");
+        } else if (climate::WeatherOverrideType() >= 0) {
+            ImGui::SetItemTooltip("Only what the climate sees (this client can't show a test weather).");
+        }
         float offset = climate::TemperatureOffset();
 
         if (ImGui::SliderFloat("temperature offset (degC, every place)", &offset, -30.0f, 30.0f, "%.1f")) {

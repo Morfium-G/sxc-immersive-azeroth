@@ -4,6 +4,8 @@
 #include <string>
 #include "World.h"
 #include "climate/Climate.h"
+#include "env/Fields.h"
+#include "env/Wind.h"
 #include "sky/Bodies.h"
 #include "sky/Clock.h"
 #include "sky/Ephemeris.h"
@@ -13,7 +15,7 @@
 namespace ia::lua {
     namespace {
         // Bump when functions are added (addons check it); never change what an existing one returns.
-        constexpr int kApiVersion = 1;
+        constexpr int kApiVersion = 2; // 2: GetGroundMoisture, GetField, GetFieldNames, GetWind; the ground's own temperature
 
         const char* WeatherName(int type) {
             switch (type) {
@@ -36,17 +38,84 @@ namespace ia::lua {
         }
 
         // ImmersiveAzeroth_GetTemperature() -> ground degC, air degC   (nil, nil outside the world)
-        // ground: near the ground where the player stands (the ground fields come later: the air's for now).
+        // ground: near the ground where the player stands (warmed by lava etc.); air: the place's climate.
         void GetTemperature(wxl::ScriptCall& call) {
-            if (!world::Current().inWorld) {
+            const world::Snapshot& s = world::Current();
+
+            if (!s.inWorld) {
                 call.PushNil();
                 call.PushNil();
                 return;
             }
 
             const float air = climate::Temperature(climate::Here()).total;
+            float ground = air;
+            fields::Sample(fields::Find("temperature"), s.playerPos, ground);
+            call.PushNumber(ground);
             call.PushNumber(air);
-            call.PushNumber(air);
+        }
+
+        // ImmersiveAzeroth_GetGroundMoisture() -> moisture 0..1, the ground's resting moisture 0..1
+        // (nil, nil where it isn't known yet)
+        void GetGroundMoisture(wxl::ScriptCall& call) {
+            const world::Snapshot& s = world::Current();
+            const fields::MoistureDetail m = s.inWorld ? fields::Moisture(s.playerPos) : fields::MoistureDetail{};
+
+            if (!m.known) {
+                call.PushNil();
+                call.PushNil();
+                return;
+            }
+
+            call.PushNumber(m.value);
+            call.PushNumber(m.rest);
+        }
+
+        // ImmersiveAzeroth_GetField(name) -> value at the player (nil if the field is unknown or has no
+        // value here). Every world field by name: "temperature", "moisture", "snow", later ones too.
+        void GetField(wxl::ScriptCall& call) {
+            const world::Snapshot& s = world::Current();
+            const std::string name = Arg(call, 0);
+            const int field = name.empty() ? -1 : fields::Find(name.c_str());
+            float value = 0.0f;
+
+            if (!s.inWorld || field < 0 || !fields::Sample(field, s.playerPos, value)) {
+                call.PushNil();
+                return;
+            }
+
+            call.PushNumber(value);
+        }
+
+        // ImmersiveAzeroth_GetFieldNames() -> name1, name2, ...
+        void GetFieldNames(wxl::ScriptCall& call) {
+            for (int f = 0; f < fields::Count(); f++) {
+                call.PushString(fields::Name(f));
+            }
+        }
+
+        // ImmersiveAzeroth_GetWind() -> strength 0..1 (gusts can pass 1), bearing (compass degrees it
+        // blows toward: 0 north, 90 east), gust 0..1, shelter 0..1 (1 exposed; lower under a roof or in
+        // a lee). At the player; nil outside the world.
+        void GetWind(wxl::ScriptCall& call) {
+            const world::Snapshot& s = world::Current();
+
+            if (!s.inWorld) {
+                call.PushNil();
+                return;
+            }
+
+            const wind::Sample w = wind::At(s.playerPos, 1.0f);
+            float bearing = std::atan2(-w.dirY, w.dirX) * 57.2957795f; // east is -y
+
+            if (bearing < 0.0f) {
+                bearing += 360.0f;
+            }
+
+            call.PushNumber(w.strength);
+            call.PushNumber(bearing);
+            call.PushNumber(w.gust);
+            call.PushNumber(w.open * w.lee);
         }
 
         // ImmersiveAzeroth_GetHumidity() -> 0..1 (the air's, from the place's climate)
@@ -187,6 +256,10 @@ namespace ia::lua {
         script.RegisterFunction<&GetTemperature>("ImmersiveAzeroth_GetTemperature");
         script.RegisterFunction<&GetHumidity>("ImmersiveAzeroth_GetHumidity");
         script.RegisterFunction<&GetWeather>("ImmersiveAzeroth_GetWeather");
+        script.RegisterFunction<&GetGroundMoisture>("ImmersiveAzeroth_GetGroundMoisture");
+        script.RegisterFunction<&GetField>("ImmersiveAzeroth_GetField");
+        script.RegisterFunction<&GetFieldNames>("ImmersiveAzeroth_GetFieldNames");
+        script.RegisterFunction<&GetWind>("ImmersiveAzeroth_GetWind");
         script.RegisterFunction<&GetSkyTime>("ImmersiveAzeroth_GetSkyTime");
         script.RegisterFunction<&GetSkyDate>("ImmersiveAzeroth_GetSkyDate");
         script.RegisterFunction<&GetSeason>("ImmersiveAzeroth_GetSeason");

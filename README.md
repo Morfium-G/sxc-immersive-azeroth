@@ -21,10 +21,19 @@ client's `sxc.*` services (data tables, settings, the tools overlay), published 
   orbits, keyframe and follow paths, visibility cycles, the lore clock), the glares on them, a body
   driving the world light, hiding M2 skyboxes per place.
 - **Climate**: temperature and humidity per place, blended across borders.
-- Panels in the overlay (Ctrl+F9): Overview, Sky, Climate.
+- **Wind** (`WindProfile.cdbc`): a steady wind per place pushed by the weather, gusts travelling
+  across the ground, calmed under roofs and in the lee of walls and cliffs.
+- **Ground materials** (`GroundMaterial`, `GroundMaterialSelector`): what each painted terrain layer
+  and each liquid is made of; `SurfaceCover` read for painted snow.
+- **The zones' weather memory**: rain soak and fallen snow per zone, kept for the session; zones
+  left behind dry and melt by their own climate, new ones catch up.
+- **World fields** on a 2 yd grid around the player: ground moisture (rest, shores, rain, heat),
+  ground temperature (hot liquids and lava ground), snow (fallen + painted, melting by temperature,
+  sun on the slope and heat nearby). Nothing draws them yet: fog, covers and grass will.
+- Panels in the overlay (Ctrl+F9): Overview, Sky, Climate, Wind, Ground.
 - Settings (`[ImmersiveAzeroth]`): `Enabled`, `SkyBodies`, `SkyDayLength`, `LoreYear`.
 
-Next, in the plan's order: wind and the world fields, then fog (froxels), covers, lights, grass.
+Next, in the plan's order: fog (froxels, Vulkan), covers, lights, grass.
 
 ## Lua
 
@@ -32,10 +41,14 @@ Read-only, for addons (example: `addons/ImmersiveAzerothClimate`):
 
 | Function | Returns |
 |---|---|
-| `ImmersiveAzeroth_GetVersion()` | API version (1) |
-| `ImmersiveAzeroth_GetTemperature()` | ground degC, air degC (the ground's own comes with the fields; the air's for now) |
+| `ImmersiveAzeroth_GetVersion()` | API version (2) |
+| `ImmersiveAzeroth_GetTemperature()` | ground degC (warmed by lava, magma), air degC |
 | `ImmersiveAzeroth_GetHumidity()` | 0..1 |
 | `ImmersiveAzeroth_GetWeather()` | "fine" / "rain" / "snow" / "sand", intensity 0..1 |
+| `ImmersiveAzeroth_GetGroundMoisture()` | moisture 0..1, the ground's resting moisture 0..1 (v2) |
+| `ImmersiveAzeroth_GetField(name)` | "temperature" / "moisture" / "snow" (yd) at the player (v2) |
+| `ImmersiveAzeroth_GetFieldNames()` | the field names (v2) |
+| `ImmersiveAzeroth_GetWind()` | strength 0..1+, bearing (degrees it blows toward), gust 0..1, shelter 0..1 (v2) |
 | `ImmersiveAzeroth_GetSkyTime()` | hour, minute, day fraction, day number, overridden (1/0) |
 | `ImmersiveAzeroth_GetSkyDate()` | year, month, day, day of year, year fraction |
 | `ImmersiveAzeroth_GetSeason()` | name, phase (0 midsummer), warmth -1..1 |
