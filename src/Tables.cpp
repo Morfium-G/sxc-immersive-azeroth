@@ -249,14 +249,14 @@ namespace {
         s.Enum("Blend").Value(0, "alpha").Value(1, "additive").Group("Look").Tooltip("Additive glows: added to the sky behind it; uses our own draw.");
         s.Int("Order").Group("Look").Tooltip("Draw order: lower first = behind; equal: file order.");
         s.ForeignKey("PathID", "SkyPath").Value(0, "stock path").Group("Motion");
-        s.Float("PeriodDays").Value(0, "hangs still").Group("Motion").Tooltip("One trip along the path, in days. 1 = daily: follows the place's time of day.");
+        s.Float("PeriodDays").Default(1).Value(0, "hangs still").Group("Motion").Tooltip("One trip along the path, in days. 1 = daily: follows the place's time of day.");
         s.Float("PhaseDays").Group("Motion").Tooltip("Offset along the path, in days.");
         s.Float("VisiblePeriodDays").Value(0, "always").Group("Visibility").Tooltip("In the sky VisibleDays out of every VisiblePeriodDays. Every third night: 3, 1, 0.5.");
         s.Float("VisibleDays").Group("Visibility");
         s.Float("VisibleOffsetDays").Group("Visibility").Tooltip("The window starts this many days after midnight of day 0 (1970-01-01).");
         s.Int("LitMode").ReadOnly().Group("Phases").Tooltip("Phases: later (2c.3).");
         s.Float("LitPeriodDays").ReadOnly().Group("Phases");
-        s.Color("LightColor").Group("World light").Tooltip("With flag 8: the world light's colour while this body drives it.");
+        s.Color("LightColor").Default(0xFFFFFF).Group("World light").Tooltip("With flag 8: the world light's colour while this body drives it.");
         s.Float("LightStrength").Range(0, 1).Group("World light").Tooltip("0 = the zone's colour as is, 1 = fully times LightColor.");
         s.Flags("Flags").Bit(0x1, "own colour").Bit(0x2, "no client glare").Bit(0x4, "our own draw").Bit(0x8, "drives the world light");
         Comment(s);
@@ -276,9 +276,9 @@ namespace {
         s.String("Name");
         s.Enum("Type").Value(0, "stock").Value(1, "orbit").Value(2, "keyframes").Value(3, "follow");
         s.Int("Frame").ReadOnly().Tooltip("Later (a star frame waits for our own star field).");
-        s.Float("RiseAzimuth").Range(0, 360).Group("Orbit").Tooltip("Compass degrees where it comes up; the map's NorthOffset is added.");
+        s.Float("RiseAzimuth").Default(90).Range(0, 360).Group("Orbit").Tooltip("Compass degrees where it comes up; the map's NorthOffset is added.");
         s.Float("Lift").Group("Orbit").Tooltip("Degrees the whole circle is raised (Lift >= Height = never sets).");
-        s.Float("Height").Group("Orbit").Tooltip("Highest elevation before Lift (peaks over RiseAzimuth + 90).");
+        s.Float("Height").Default(60).Group("Orbit").Tooltip("Highest elevation before Lift (peaks over RiseAzimuth + 90).");
         s.ForeignKey("FollowBody", "SkyBody").Group("Follow").Tooltip("The leader (up to 4 deep).");
         s.Float("SeparationMin").Group("Follow").Tooltip("Degrees from the leader, swinging from Min to Max and back over SeparationDays.");
         s.Float("SeparationMax").Group("Follow");
@@ -302,10 +302,10 @@ namespace {
         s.Float("Time").Range(0, 1).Tooltip("0..1 along the path (one trip = the body's PeriodDays).");
         s.Float("Azimuth").Tooltip("Compass degrees (follow paths: degrees to the leader's right).");
         s.Float("Elevation").Tooltip("Degrees above the horizon (follow paths: above the leader).");
-        s.Float("Size").Value(0, "1").Tooltip("Multiplier on the body's Size.");
+        s.Float("Size").Default(1).Value(0, "1").Tooltip("Multiplier on the body's Size.");
         s.Flags("Flags");
         Comment(s);
-        s.Float("LeaderBrightness").Value(0, "1").Group("Follow").Tooltip("The leader's brightness at this key.");
+        s.Float("LeaderBrightness").Default(1).Value(0, "1").Group("Follow").Tooltip("The leader's brightness at this key.");
         s.Enum("Order").Value(-1, "behind the leader").Value(0, "by the bodies' Order").Value(1, "in front of the leader").Group("Follow");
         return s;
     }

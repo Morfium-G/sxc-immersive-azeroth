@@ -1,0 +1,6 @@
+## Interface: 30300
+## Title: Immersive Azeroth: Climate
+## Notes: Temperature, humidity and weather under the minimap clock; the sky's time and season on hover (example for the Immersive Azeroth Lua functions).
+## Author: Seyri
+## Version: 1
+ImmersiveAzerothClimate.lua

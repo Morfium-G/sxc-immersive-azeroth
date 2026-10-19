@@ -11,7 +11,12 @@
   "requires": [
     { "service": "sxc.data", "version": 1 },
     { "service": "sxc.settings", "version": 1 },
-    { "service": "sxc.ui", "version": 1 }
+    { "service": "sxc.ui", "version": 1 },
+    { "service": "sxc.world", "version": 1 },
+    { "service": "sxc.sky", "version": 1 }
+  ],
+  "optional": [
+    { "service": "wxl.script", "version": 1 }
   ],
   "loadAfter": ["sxc.bridge"]
 }

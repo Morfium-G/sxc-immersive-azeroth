@@ -13,13 +13,17 @@ set(IA_IMGUI_DIR "${SXC_CLIENT_DIR}/SXC/ThirdParty/imgui")
 
 # dist/seyri.immersive-azeroth/{mod.json, bin/x64/immersive-azeroth.dll}. x64 only: it needs our client.
 wxl_add_mod(immersive-azeroth
-    SOURCES src/Mod.cpp src/Tables.cpp
+    SOURCES
+        src/Mod.cpp src/Tables.cpp src/World.cpp src/Lua.cpp
+        src/climate/Climate.cpp
+        src/sky/Clock.cpp src/sky/SkyTime.cpp src/sky/BodyTables.cpp src/sky/Paths.cpp src/sky/Ephemeris.cpp src/sky/Bodies.cpp
+        src/ui/SkyPanel.cpp src/ui/ClimatePanel.cpp
     MANIFEST mod.json
     TARGETS win-x64)
 
 if (TARGET immersive-azeroth)
     target_compile_features(immersive-azeroth PRIVATE cxx_std_17)
-    target_include_directories(immersive-azeroth PRIVATE "${SXC_CLIENT_DIR}" "${IA_IMGUI_DIR}")
+    target_include_directories(immersive-azeroth PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${SXC_CLIENT_DIR}" "${IA_IMGUI_DIR}")
     target_sources(immersive-azeroth PRIVATE
         "${IA_IMGUI_DIR}/imgui.cpp"
         "${IA_IMGUI_DIR}/imgui_draw.cpp"
