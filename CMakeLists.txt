@@ -17,8 +17,9 @@ wxl_add_mod(immersive-azeroth
         src/Mod.cpp src/Tables.cpp src/World.cpp src/Lua.cpp
         src/climate/Climate.cpp
         src/env/Shelter.cpp src/env/Wind.cpp src/env/Materials.cpp src/env/CoverTable.cpp src/env/Regional.cpp src/env/Fields.cpp
+        src/fog/Fog.cpp
         src/sky/Clock.cpp src/sky/SkyTime.cpp src/sky/BodyTables.cpp src/sky/Paths.cpp src/sky/Ephemeris.cpp src/sky/Bodies.cpp
-        src/ui/SkyPanel.cpp src/ui/ClimatePanel.cpp src/ui/WindPanel.cpp src/ui/GroundPanel.cpp
+        src/ui/SkyPanel.cpp src/ui/ClimatePanel.cpp src/ui/WindPanel.cpp src/ui/GroundPanel.cpp src/ui/FogPanel.cpp
     MANIFEST mod.json
     TARGETS win-x64)
 

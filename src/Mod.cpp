@@ -20,6 +20,7 @@
 #include "env/Regional.h"
 #include "env/Shelter.h"
 #include "env/Wind.h"
+#include "fog/Fog.h"
 #include "imgui.h"
 #include "sky/Bodies.h"
 #include "sky/BodyTables.h"
@@ -133,6 +134,7 @@ namespace {
             sxc::ui::AddPanel(module, "Climate", ia::ui::DrawClimate);
             sxc::ui::AddPanel(module, "Wind", ia::ui::DrawWind);
             sxc::ui::AddPanel(module, "Ground", ia::ui::DrawGround);
+            sxc::ui::AddPanel(module, "Fog", ia::ui::DrawFog);
 
             char line[160];
             std::snprintf(line, sizeof(line), "ready: tables registered, sky provider %s, overlay module %s", ia::sky::Api() ? "set" : "unavailable",
@@ -163,6 +165,7 @@ namespace {
             // a logout: the zones' weather memory is per session).
             if (!cfg.enabled.Get() || !snap.inWorld) {
                 if (m_envRunning) {
+                    ia::fog::Stop();
                     ia::fields::Reset();
                     ia::regional::Reset();
                     ia::shelter::Clear();
@@ -178,6 +181,7 @@ namespace {
             ia::wind::Update(dt, snap);
             ia::regional::Update(dt, snap);
             ia::fields::Update(dt, snap);
+            ia::fog::Update(dt, snap);
         }
 
         struct OnUpdate {

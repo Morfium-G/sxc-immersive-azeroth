@@ -16,7 +16,8 @@
     { "service": "sxc.sky", "version": 1 }
   ],
   "optional": [
-    { "service": "wxl.script", "version": 1 }
+    { "service": "wxl.script", "version": 1 },
+    { "service": "sxc.fog", "version": 1 }
   ],
   "loadAfter": ["sxc.bridge"]
 }
