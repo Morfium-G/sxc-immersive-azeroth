@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.21)
+
+# No language here: wxl_add_mod enables C++ in the per-architecture child build.
+project(immersive-azeroth VERSION 0.1.0 LANGUAGES NONE)
+
+# Checkouts beside this one (the XLClient hub layout): the SDK, and our client for the sxc.* headers
+# (SXC/Api) and its Dear ImGui, which the mod must share version for version.
+set(WXL_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk" CACHE PATH "Path to the WarcraftXL SDK")
+set(SXC_CLIENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../client" CACHE PATH "Path to our client checkout")
+include("${WXL_SDK_DIR}/cmake/wxl_add_mod.cmake")
+
+set(IA_IMGUI_DIR "${SXC_CLIENT_DIR}/SXC/ThirdParty/imgui")
+
+# dist/seyri.immersive-azeroth/{mod.json, bin/x64/immersive-azeroth.dll}. x64 only: it needs our client.
+wxl_add_mod(immersive-azeroth
+    SOURCES src/Mod.cpp src/Tables.cpp
+    MANIFEST mod.json
+    TARGETS win-x64)
+
+if (TARGET immersive-azeroth)
+    target_compile_features(immersive-azeroth PRIVATE cxx_std_17)
+    target_include_directories(immersive-azeroth PRIVATE "${SXC_CLIENT_DIR}" "${IA_IMGUI_DIR}")
+    target_sources(immersive-azeroth PRIVATE
+        "${IA_IMGUI_DIR}/imgui.cpp"
+        "${IA_IMGUI_DIR}/imgui_draw.cpp"
+        "${IA_IMGUI_DIR}/imgui_tables.cpp"
+        "${IA_IMGUI_DIR}/imgui_widgets.cpp")
+endif ()
