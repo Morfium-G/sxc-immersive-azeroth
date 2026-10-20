@@ -24,11 +24,17 @@ namespace ia::fog {
         float stepLength = 0.5f;     // yd: the step near the camera (smaller: smoother thin layers, more GPU)
         bool froxels = false;        // the froxel volume instead of a march per pixel (cheaper, coarse)
         int maxSteps = 160;          // per pixel: the most steps a ray takes
+        bool farFog = true;          // each zone's typical fog beyond the near field (fog/Far)
+        float handover = 64.0f;      // yd: the near fog fades into the far fog over this band at the field's edge (WXL's; wider = softer seam, less near detail)
+        int debugPlaces = 0;         // debug: the fog coloured by place (0 off, 1 by zone, 2 by area), blended where places mix
+        bool debugNearFar = false;   // debug: the near field green, the far fog blue, the haze grey (WXL's view 4)
+        float fadeIn = 1.5f;         // s: a near cell that just started fades in over the far fog
     };
     Look& LookSettings();
 
-    // Once per frame, after fog::Update (the field).
-    void Draw(const world::Snapshot& snap);
+    // Once per frame, after fog::Update (the field): the field, the far map and the wake (fog/Wake) to
+    // the client.
+    void Draw(float dt, const world::Snapshot& snap);
 
     // The mod is off or the world was left: the client stops drawing it.
     void Stop();

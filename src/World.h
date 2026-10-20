@@ -58,6 +58,20 @@ namespace ia::world {
     // and everything after it follow. False when the client can't (an older one).
     bool SetClientWeather(int type, float intensity);
     int ClientWeatherTest(); // its type, -1 off
+
+    // A unit near a point: players, NPCs, creatures (WXL: env/Actors, from raw descriptor offsets).
+    struct Unit {
+        uint64_t guid = 0;
+        float pos[3] = {};
+        float boundingRadius = 0.5f;  // yd, as the server sends it
+        float effectiveRadius = 0.5f; // yd, scaled by how much wider a morph's or shapeshift's model is
+        float distance = 0.0f;        // yd from the query's centre
+        bool mounted = false;
+        bool isPlayer = false;        // the active player
+    };
+
+    // The units within `range` yd of `centre`, nearest first, at most `max`. 0 on an older client.
+    int Units(const float centre[3], float range, Unit* out, int max);
 }
 
 // The terrain at a point: the drawn surface and what it's painted with. WMOs and doodads don't count.

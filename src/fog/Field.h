@@ -106,6 +106,10 @@ namespace ia::fog {
         bool inRange = false;
     };
     unsigned ZoneStates(ZoneState* out, unsigned max);
+    // A zone's typical amount of a kind (0 for a zone not seen, and for the kinds that need detail:
+    // water fog, steam), and that zone's settings of the kind (for the far map).
+    float ZoneAmount(uint32_t zone, int kind);
+    KindSettings ZoneSettings(int kind, uint32_t zone);
 
     // A kind's settings in a cell (storage index): its place's, blended toward the other place around.
     KindSettings SettingsAt(int kind, int index);

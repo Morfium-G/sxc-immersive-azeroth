@@ -2,9 +2,11 @@
 
 #include <cstdio>
 #include "World.h"
+#include "fog/Far.h"
 #include "fog/Field.h"
 #include "fog/Fog.h"
 #include "fog/FogSettings.h"
+#include "fog/Wake.h"
 #include "imgui.h"
 
 namespace ia::ui {
@@ -176,6 +178,40 @@ namespace ia::ui {
             ImGui::SetItemTooltip("Everywhere, on top of the fog kinds (testing). The haze kind itself comes with rain.");
             ImGui::SliderFloat("extra haze height (yd)", &look.hazeThickness, 5.0f, 200.0f, "%.0f");
         }
+
+        void FarAndWake() {
+            fog::Look& look = fog::LookSettings();
+            ImGui::Checkbox("far fog (each zone's typical fog beyond the field)", &look.farFog);
+            ImGui::SetItemTooltip("Mist, area fog and haze per terrain chunk out to ~1 km, from each zone's typical fog (the Zones list). "
+                                  "Beyond the reach, one long step through it to the terrain.");
+            ImGui::Checkbox("near green, far blue (debug)", &look.debugNearFar);
+            ImGui::SetItemTooltip("Where the fog comes from: the near field green, the far fog blue, the haze grey. Mixed = the hand-over.");
+            ImGui::SliderFloat("new cells fade in (s)", &look.fadeIn, 0.0f, 5.0f, "%.1f");
+            ImGui::SetItemTooltip("A near cell that just started fades in over the far fog instead of switching at once (0 = at once, the old way).");
+            ImGui::SliderFloat("hand-over band (yd)", &look.handover, 4.0f, 120.0f, "%.0f");
+            ImGui::SetItemTooltip("The near fog fades into the far fog over this band at the near field's edge (128 yd out). "
+                                  "Wider: a softer seam, less near detail at the rim. WXL used 64.");
+            const fog::farmap::Stats fs = fog::farmap::GetStats();
+            ImGui::TextDisabled("far map: %u chunks with ground, %u with fog; %u builds, last %.2f ms", fs.ground, fs.foggy, fs.builds, fs.buildMs);
+
+            fog::wake::Settings& w = fog::wake::Config();
+            ImGui::Checkbox("units push the fog aside", &w.enabled);
+
+            if (w.enabled) {
+                ImGui::SliderFloat("push while moving", &w.strength, 0.0f, 1.0f, "%.2f");
+                ImGui::SliderFloat("push while standing", &w.standing, 0.0f, 1.0f, "%.2f");
+                ImGui::SliderFloat("wake fills back in (s)", &w.trailSeconds, 0.5f, 10.0f, "%.1f");
+                ImGui::SliderFloat("wake radius (x the unit's)", &w.radiusScale, 0.5f, 4.0f, "%.2f");
+                ImGui::SliderFloat("wake widens (x its radius)", &w.spread, 0.0f, 3.0f, "%.2f");
+                ImGui::SliderFloat("wake height (x the unit's)", &w.heightScale, 0.5f, 3.0f, "%.2f");
+                ImGui::SliderFloat("fog piled at the rim", &w.rim, 0.0f, 1.0f, "%.2f");
+                ImGui::SliderFloat("swirl", &w.swirl, 0.0f, 3.0f, "%.2f");
+            }
+
+            const fog::wake::Stats ws = fog::wake::GetStats();
+            ImGui::TextDisabled("wake: %u units, %u stretches, %.3f ms CPU; map %dx%d of %.0f yd%s", ws.units, ws.segments, ws.ms, fog::wake::kSize,
+                                fog::wake::kSize, fog::wake::kTexel, ws.sent ? "" : " (not sent: no fog or no units near)");
+        }
     }
 
     void DrawFog(void*) {
@@ -190,6 +226,12 @@ namespace ia::ui {
         ImGui::Checkbox("Draw the fog", &look.enabled);
         ImGui::SameLine();
         ImGui::Checkbox("magenta (where is it?)", &look.debug);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(150.0f);
+        static const char* const kPlaces[] = { "off", "by zone", "by area (subzones)" };
+        ImGui::Combo("coloured by place", &look.debugPlaces, kPlaces, IM_ARRAYSIZE(kPlaces));
+        ImGui::SetItemTooltip("Debug: each zone or area's fog in its own colour (red, green, blue, yellow, magenta, cyan, orange, white, "
+                              "in the order they're met), blended where places mix. The far fog takes its zone's colour.");
         ImGui::SetNextItemWidth(160.0f);
         ImGui::SliderFloat("fog step (yd)", &look.stepLength, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
         ImGui::SetItemTooltip("The quality: the fog is integrated in steps this long near you (growing with the distance). Smaller = smoother thin layers, more GPU time.");
@@ -216,6 +258,10 @@ namespace ia::ui {
 
         if (ImGui::CollapsingHeader("Zones (typical fog, this session)")) {
             Zones();
+        }
+
+        if (ImGui::CollapsingHeader("Far fog and the wake (not saved)")) {
+            FarAndWake();
         }
 
         if (ImGui::CollapsingHeader("Look (not saved)")) {

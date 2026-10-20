@@ -25,16 +25,21 @@ namespace ia::regional {
         constexpr float kChunk = 100.0f / 3.0f;
         constexpr int kMapRecentre = 4;   // chunks the player moves before the window follows
         constexpr int kMapPerFrame = 256; // chunk lookups per frame
+        constexpr double kMapRetry = 0.25; // s: a chunk not loaded is asked again after this
 
         struct MapSlot {
             int i = 0x7FFFFFFF, j = 0;
+            double triedAt = -1.0e9;
         };
+
+        // Offsets from the player's chunk, nearest first: the chunks loading in ahead get their zone
+        // within a frame (a sweep over the window, mostly unloaded chunks, reached them late when flying).
+        std::vector<std::pair<int, int>> g_mapOrder;
 
         std::vector<Zone> g_zones;
         std::vector<MapSlot> g_mapSlots(kMapSize * kMapSize);
         std::vector<uint32_t> g_mapZone(kMapSize * kMapSize, 0);
         ZoneMap g_map;
-        int g_mapCursor = 0;
         bool g_haveMap = false;
         int g_mapMap = -1;
 
@@ -69,20 +74,45 @@ namespace ia::regional {
             g_map.cellSize = kChunk;
             g_map.zone = g_mapZone.data();
 
-            // A slice per frame: chunks whose slot holds another world chunk or isn't known yet.
-            for (int n = 0; n < kMapPerFrame; n++) {
-                const int k = g_mapCursor;
-                g_mapCursor = (g_mapCursor + 1) % (kMapSize * kMapSize);
-                const int i = g_map.firstI + k % kMapSize, j = g_map.firstJ + k / kMapSize;
+            if (g_mapOrder.empty()) {
+                for (int dj = -kMapSize / 2; dj < kMapSize / 2; dj++) {
+                    for (int di = -kMapSize / 2; di < kMapSize / 2; di++) {
+                        g_mapOrder.emplace_back(di, dj);
+                    }
+                }
+
+                std::stable_sort(g_mapOrder.begin(), g_mapOrder.end(), [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                    return a.first * a.first + a.second * a.second < b.first * b.first + b.second * b.second;
+                });
+            }
+
+            // Nearest first, some per frame: chunks whose slot holds another world chunk, or that weren't
+            // loaded when last asked.
+            const int ci = pi + kMapSize / 2, cj = pj + kMapSize / 2; // the player's chunk
+            int lookups = 0;
+
+            for (const auto& o : g_mapOrder) {
+                if (lookups >= kMapPerFrame) {
+                    break;
+                }
+
+                const int i = ci + o.first, j = cj + o.second;
+
+                if (i < g_map.firstI || i >= g_map.firstI + kMapSize || j < g_map.firstJ || j >= g_map.firstJ + kMapSize) {
+                    continue;
+                }
+
                 const int slot = MapMod(j) * kMapSize + MapMod(i);
                 MapSlot& m = g_mapSlots[slot];
 
-                if (m.i == i && m.j == j && g_mapZone[slot]) {
+                if (m.i == i && m.j == j && (g_mapZone[slot] || g_now - m.triedAt < kMapRetry)) {
                     continue;
                 }
 
                 m.i = i;
                 m.j = j;
+                m.triedAt = g_now;
+                lookups++;
                 uint32_t area = 0;
                 g_mapZone[slot] = world::ChunkAreaAt((i + 0.5f) * kChunk, (j + 0.5f) * kChunk, area) ? ZoneOf(area) : 0;
             }

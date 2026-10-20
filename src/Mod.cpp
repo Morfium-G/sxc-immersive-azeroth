@@ -186,7 +186,7 @@ namespace {
             ia::fields::Update(dt, snap);
             ia::fogsettings::Update();
             ia::fog::Update(dt, snap);
-            ia::fog::Draw(snap);
+            ia::fog::Draw(dt, snap);
         }
 
         struct OnUpdate {

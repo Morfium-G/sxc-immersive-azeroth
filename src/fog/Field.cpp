@@ -1444,6 +1444,18 @@ namespace ia::fog {
         return n;
     }
 
+    float ZoneAmount(uint32_t zone, int kind) {
+        const ZoneFog* z = kind >= 0 && kind < kKindCount ? FindZoneFog(zone) : nullptr;
+        return z ? z->amount[kind] : 0.0f;
+    }
+
+    KindSettings ZoneSettings(int kind, uint32_t zone) {
+        kind = kind >= 0 && kind < kKindCount ? kind : 0;
+        KindSettings s = g_slots[SlotOf(zone)].kind[kind];
+        s.enabled = g_settings[kind].enabled;
+        return s;
+    }
+
     KindSettings SettingsAt(int kind, int index) {
         kind = kind >= 0 && kind < kKindCount ? kind : 0;
         return g_areaSlot.empty() ? g_settings[kind] : CellSettings(kind, index);

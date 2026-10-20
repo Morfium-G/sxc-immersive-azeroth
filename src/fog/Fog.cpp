@@ -2,12 +2,16 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <unordered_map>
 #include <vector>
 #include "SXC/Api/sxc_fog.h"
+#include "env/Regional.h"
 #include "env/Wind.h"
+#include "fog/Far.h"
 #include "fog/Field.h"
 #include "fog/FogSettings.h"
+#include "fog/Wake.h"
 #include "wxl/sdk.hpp"
 
 namespace ia::fog {
@@ -63,6 +67,31 @@ namespace ia::fog {
 
             for (int i = 0; i < 3; i++) {
                 out[i] = (grey + (c[i] - grey) * v.saturation) * v.brightness;
+            }
+        }
+
+        // The debug view "fog coloured by place" (WXL's): each zone or area a colour from the palette, in
+        // the order they're met, kept while the map stays.
+        void PlaceColour(uint32_t area, int mapId, float out[3]) {
+            static const float kPalette[8][3] = { { 1.0f, 0.15f, 0.15f }, { 0.2f, 1.0f, 0.2f }, { 0.25f, 0.4f, 1.0f }, { 1.0f, 0.95f, 0.2f },
+                                                  { 1.0f, 0.3f, 1.0f },   { 0.2f, 1.0f, 1.0f }, { 1.0f, 0.6f, 0.15f }, { 1.0f, 1.0f, 1.0f } };
+            static std::unordered_map<uint32_t, int> s_index;
+            static int s_indexMap = -2;
+
+            if (s_indexMap != mapId) {
+                s_index.clear();
+                s_indexMap = mapId;
+            }
+
+            const uint32_t place = g_look.debugPlaces == 1 ? (area ? regional::ZoneOf(area) : 0) : area;
+            auto found = s_index.find(place);
+
+            if (found == s_index.end()) {
+                found = s_index.emplace(place, static_cast<int>(s_index.size()) % 8).first;
+            }
+
+            for (int ch = 0; ch < 3; ch++) {
+                out[ch] = kPalette[found->second][ch];
             }
         }
 
@@ -170,13 +199,25 @@ namespace ia::fog {
                     mixWeight += share;
                 }
 
+                // Debug: the place's palette colour instead, blended toward the other place around by
+                // the same share as its settings (where they mix shows as a mix).
+                if (g_look.debugPlaces && mixWeight > 0.0f) {
+                    float own[3], other[3];
+                    PlaceColour(area, snap.mapId, own);
+                    PlaceColour(otherShare > 0.0f && otherArea ? otherArea : area, snap.mapId, other);
+
+                    for (int ch = 0; ch < 3; ch++) {
+                        mix[ch] = (own[ch] + (other[ch] - own[ch]) * otherShare) * mixWeight;
+                    }
+                }
+
                 const bool blocked = grid.block[index] == 3;
                 const bool unready = !grid.groundKnown[index] || grid.fresh[index];
                 float* light = &g_light[index * 4];
                 float* heavy = &g_pool[index * 4];
                 light[0] = blocked || unready ? 0.0f : density;
                 light[1] = density > 0.0f ? floorSum / density : g_base[index];
-                light[2] = density > 0.0f ? weighted / density : 1.0f;
+                light[2] = unready ? -1.0f : (density > 0.0f ? weighted / density : 1.0f); // not ready: the far map shows
                 light[3] = density > 0.0f ? patchy / density : 0.0f;
                 const bool pooled = !blocked && !unready && pool >= 0.02f && poolWeight > 0.0f;
                 heavy[0] = pooled ? poolDensity / poolWeight : 0.0f;
@@ -219,6 +260,92 @@ namespace ia::fog {
             }
         }
 
+        // The far map's colours: a kind's at a place, over this frame's stock colour.
+        float g_farStock[3] = { 0.6f, 0.6f, 0.65f };
+        int g_farMapId = -1;
+        bool g_farSent = false;
+
+        void FarColour(int kind, uint32_t area, float out[3]) {
+            if (g_look.debugPlaces) {
+                PlaceColour(area, g_farMapId, out);
+                return;
+            }
+
+            FogColour(kind, area, g_farMapId, g_farStock, out);
+        }
+
+        const sxc_fog_api* FarApi() {
+            const sxc_fog_api* api = Api();
+            return api && api->struct_size >= offsetof(sxc_fog_api, set_far) + sizeof(api->set_far) ? api : nullptr;
+        }
+
+        void ClearFar() {
+            if (g_farSent && FarApi()) {
+                FarApi()->set_far(nullptr);
+            }
+
+            g_farSent = false;
+        }
+
+        // The far map: rebuilt twice a second by fog/Far; sent when it changed.
+        void DrawFar(const world::Snapshot& snap) {
+            if (!g_look.farFog || !FarApi()) {
+                ClearFar();
+                return;
+            }
+
+            Api()->stock_colour(g_farStock);
+            g_farMapId = snap.mapId;
+            farmap::Map map;
+            bool any = false;
+
+            if (!farmap::Update(&FarColour, snap.playerPos, map, any)) {
+                return;
+            }
+
+            if (!any) {
+                ClearFar();
+                return;
+            }
+
+            sxc_fog_far out = {};
+            out.struct_size = sizeof(out);
+            out.size = static_cast<uint32_t>(map.size);
+            out.cell_size = map.cellSize;
+            out.first_i = map.firstI;
+            out.first_j = map.firstJ;
+            out.layer = map.layer;
+            out.colour = map.colour;
+            FarApi()->set_far(&out);
+            g_farSent = true;
+        }
+
+        // Cells that just started fade in over the far fog: before, a cell switched from the far fog
+        // (the zone's typical fog on the low ground around) to its own in one frame, and wherever the two
+        // differed that popped (Seyri, Duskwood's area fog). True when any share changed.
+        std::vector<float> g_ready(N * N, 0.0f);
+
+        bool StepReady(float dt) {
+            const Grid& grid = Current();
+            const float step = g_look.fadeIn > 0.05f ? dt / g_look.fadeIn : 1.0f;
+            bool changed = false;
+
+            for (int index = 0; index < N * N; index++) {
+                float& r = g_ready[index];
+                const bool unready = !grid.groundKnown[index] || grid.fresh[index];
+
+                if (unready) {
+                    changed = changed || r != 0.0f;
+                    r = 0.0f;
+                } else if (r < 1.0f) {
+                    r = std::fmin(1.0f, r + step);
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
         bool AnyFog() {
             const Grid& grid = Current();
 
@@ -234,7 +361,7 @@ namespace ia::fog {
 
     Look& LookSettings() { return g_look; }
 
-    void Draw(const world::Snapshot& snap) {
+    void Draw(float dt, const world::Snapshot& snap) {
         const sxc_fog_api* api = Api();
 
         if (!api || !snap.inWorld) {
@@ -245,14 +372,24 @@ namespace ia::fog {
         g_player[1] = snap.playerPos[1];
         g_player[2] = snap.playerPos[2];
         const Grid& grid = Current();
+        bool fogNear = false;
 
         // The field: when it changed, and the colours twice a second (they follow the time of day).
         if (grid.ground && grid.amount[0]) {
             const bool any = AnyFog();
+            fogNear = any;
             const double now = NowMs();
+            const bool fading = StepReady(dt);
+            const bool rebuild = grid.version != g_sentVersion || now - g_lastColours > kColourRefreshMs;
 
-            if (any && (grid.version != g_sentVersion || now - g_lastColours > kColourRefreshMs)) {
-                Build(snap);
+            // Rebuilt when the field changed and for the colours; sent again as it is while cells fade in.
+            if (any && (rebuild || fading)) {
+                if (rebuild) {
+                    Build(snap);
+                    g_sentVersion = grid.version;
+                    g_lastColours = now;
+                }
+
                 sxc_fog_field field = {};
                 field.struct_size = sizeof(field);
                 field.size = N;
@@ -262,9 +399,8 @@ namespace ia::fog {
                 field.light = g_light.data();
                 field.pool = g_pool.data();
                 field.colour = g_tint.data();
+                field.ready = g_ready.data();
                 api->set_field(&field);
-                g_sentVersion = grid.version;
-                g_lastColours = now;
                 g_sentEmpty = false;
                 g_uploads++;
             } else if (!any && !g_sentEmpty) {
@@ -272,6 +408,9 @@ namespace ia::fog {
                 g_sentEmpty = true;
             }
         }
+
+        DrawFar(snap);
+        wake::Update(dt, snap, fogNear);
 
         // The look, every frame. The patches drift with the steady wind (the client sums the drift).
         const float bearing = wind::BearingDegrees() * 3.14159265f / 180.0f;
@@ -290,10 +429,11 @@ namespace ia::fog {
         look.haze_density = g_look.hazeDensity;
         look.haze_base = g_player[2] - 2.0f;
         look.haze_thickness = g_look.hazeThickness;
-        look.debug = g_look.debug ? 1 : 0;
+        look.debug = g_look.debugNearFar ? 2 : (g_look.debug ? 1 : 0);
         look.step_length = g_look.stepLength;
         look.method = g_look.froxels ? 1 : 0;
         look.max_steps = g_look.maxSteps;
+        look.handover = g_look.handover;
         api->set_look(&look);
     }
 
@@ -306,6 +446,9 @@ namespace ia::fog {
             api->set_field(nullptr);
         }
 
+        ClearFar();
+        farmap::Reset();
+        wake::Reset();
         g_sentEmpty = true;
         g_sentVersion = ~0u;
     }

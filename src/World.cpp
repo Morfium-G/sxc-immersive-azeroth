@@ -1,6 +1,7 @@
 #include "World.h"
 
 #include <cstddef>
+#include <vector>
 #include "SXC/Api/sxc_world.h"
 #include "wxl/sdk.hpp"
 
@@ -126,6 +127,35 @@ namespace ia::world {
     int ClientWeatherTest() {
         const sxc_world_api* api = ViewApi();
         return api ? api->weather_test() : -1;
+    }
+
+    int Units(const float centre[3], float range, Unit* out, int max) {
+        const sxc_world_api* api = Api();
+
+        if (!api || api->struct_size < offsetof(sxc_world_api, units) + sizeof(api->units) || !out || max <= 0) {
+            return 0;
+        }
+
+        static std::vector<sxc_world_unit> s_units;
+        s_units.resize(static_cast<size_t>(max));
+        const wxl_vec3 c{ centre[0], centre[1], centre[2] };
+        const int count = api->units(&c, range, s_units.data(), max, sizeof(sxc_world_unit));
+
+        for (int i = 0; i < count; i++) {
+            const sxc_world_unit& u = s_units[i];
+            Unit& o = out[i];
+            o.guid = u.guid;
+            o.pos[0] = u.position.x;
+            o.pos[1] = u.position.y;
+            o.pos[2] = u.position.z;
+            o.boundingRadius = u.bounding_radius;
+            o.effectiveRadius = u.effective_radius;
+            o.distance = u.distance;
+            o.mounted = u.mounted != WXL_FALSE;
+            o.isPlayer = u.is_player != WXL_FALSE;
+        }
+
+        return count;
     }
 }
 
