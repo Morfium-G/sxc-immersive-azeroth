@@ -3,7 +3,8 @@
 //
 // Now: its tables, the sky clock (debug override, pinned / shifted places, seasonal day length), the
 // sky bodies, the climate, wind and shelter, the ground materials, the zones' rain and snow, the world
-// fields near the player (moisture, temperature, snow), Lua functions, and panels in the overlay.
+// fields near the player (moisture, temperature, snow), the fog, the covers' look in the terrain (snow,
+// sand, mud, wetness), Lua functions, and panels in the overlay.
 
 #include <cstdio>
 #include <memory>
@@ -14,6 +15,7 @@
 #include "Tables.h"
 #include "World.h"
 #include "climate/Climate.h"
+#include "cover/Cover.h"
 #include "env/CoverTable.h"
 #include "env/Fields.h"
 #include "env/Materials.h"
@@ -55,7 +57,8 @@ namespace {
 
     void DrawOverview(void*) {
         ImGui::TextWrapped("Immersive Azeroth is being ported from WXL. Here now: the sky clock and bodies, the climate, wind, the world fields "
-                           "(moisture, temperature, snow) and the zones' weather memory. Next: fog, covers, lights, grass.");
+                           "(moisture, temperature, snow), the zones' weather memory, the fog and the covers' look. Next: the covers' depth, "
+                           "lights, grass.");
         ImGui::SeparatorText("Tables");
 
         if (ImGui::BeginTable("##tables", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
@@ -137,6 +140,7 @@ namespace {
             sxc::ui::AddPanel(module, "Wind", ia::ui::DrawWind);
             sxc::ui::AddPanel(module, "Ground", ia::ui::DrawGround);
             sxc::ui::AddPanel(module, "Fog", ia::ui::DrawFog);
+            sxc::ui::AddPanel(module, "Cover", ia::ui::DrawCover);
 
             char line[160];
             std::snprintf(line, sizeof(line), "ready: tables registered, sky provider %s, overlay module %s", ia::sky::Api() ? "set" : "unavailable",
@@ -168,6 +172,7 @@ namespace {
             if (!cfg.enabled.Get() || !snap.inWorld) {
                 if (m_envRunning) {
                     ia::fog::Stop();
+                    ia::cover::Stop();
                     ia::fog::Reset();
                     ia::fields::Reset();
                     ia::regional::Reset();
@@ -187,6 +192,7 @@ namespace {
             ia::fogsettings::Update();
             ia::fog::Update(dt, snap);
             ia::fog::Draw(dt, snap);
+            ia::cover::Update(snap);
         }
 
         struct OnUpdate {

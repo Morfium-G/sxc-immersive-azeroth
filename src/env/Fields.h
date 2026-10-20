@@ -104,6 +104,27 @@ namespace ia::fields {
     uint32_t SnowVersion();
     bool SnowActive();
 
+    // For the cover (sxc.cover's maps, cover/Cover): per cell 4 floats -- fallen snow (yd), painted snow's
+    // kept share (0..1), moisture above the ground's rest (0..1), the water surface (world z; kNoWater:
+    // none within 12 yd). Near: the grid's layout, every cell filled (cells not known yet take the zones'
+    // values, and the grid fades into them over its last yards); far: per terrain chunk (env/Regional's
+    // zone map), the zones' values. Rebuilt every step (4 a second); `version` changes with it.
+    constexpr float kNoWater = -100000.0f;
+
+    struct CoverMaps {
+        int size = 0;
+        float cellSize = 0.0f;
+        int firstI = 0, firstJ = 0;
+        const float* cells = nullptr;
+        int farSize = 0;
+        float farCellSize = 0.0f;
+        int farFirstI = 0, farFirstJ = 0;
+        const float* farCells = nullptr;
+        float outside[3] = { 0.0f, 1.0f, 0.0f }; // beyond the far map: the player's zone
+        uint32_t version = 0;
+    };
+    const CoverMaps& CoverGround();
+
     struct Stats {
         unsigned filled = 0, cells = 0, water = 0, hotGround = 0, snowPublished = 0;
         double fillMs = 0.0, transformMs = 0.0, tickMs = 0.0;

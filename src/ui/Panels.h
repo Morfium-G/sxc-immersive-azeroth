@@ -7,4 +7,5 @@ namespace ia::ui {
     void DrawWind(void* user);
     void DrawGround(void* user);
     void DrawFog(void* user);
+    void DrawCover(void* user);
 }

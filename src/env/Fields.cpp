@@ -111,6 +111,8 @@ namespace ia::fields {
         double g_lastSnowPublish = 0.0;
 
         WetGrid g_wet;
+        CoverMaps g_coverMaps;
+        std::vector<float> g_coverNear(kSize * kSize * 4), g_coverFar;
         int g_firstI = 0, g_firstJ = 0;
         bool g_haveGrid = false;
         int g_map = -1;
@@ -536,6 +538,121 @@ namespace ia::fields {
             g_lastSnowPublish = regional::Now();
         }
 
+        // The cover's maps (CoverMaps) from this step's values: the snow as computed now (not the throttled
+        // published copy: these go to the GPU every step anyway), the moisture above rest, the water line.
+        void BuildCoverMaps() {
+            const SnowMap& now = g_snowNow;
+            const regional::ZoneMap& zm = regional::Map();
+            const bool far = now.farSize > 0 && zm.size == now.farSize && g_farValues.size() == static_cast<size_t>(now.farSize) * now.farSize;
+            CoverMaps& m = g_coverMaps;
+            m.outside[0] = now.outsideFallen;
+            m.outside[1] = now.outsideKeep;
+            m.outside[2] = g_wet.farExcess;
+
+            // The zones' values per chunk.
+            if (far) {
+                const size_t n = static_cast<size_t>(now.farSize) * now.farSize;
+                g_coverFar.resize(n * 4);
+
+                for (size_t q = 0; q < n; q++) {
+                    g_coverFar[q * 4 + 0] = now.farFallen[q];
+                    g_coverFar[q * 4 + 1] = now.farKeep[q];
+                    g_coverFar[q * 4 + 2] = g_farValues[q];
+                    g_coverFar[q * 4 + 3] = kNoWater;
+                }
+
+                m.farSize = now.farSize;
+                m.farCellSize = now.farCell;
+                m.farFirstI = now.farFirstI;
+                m.farFirstJ = now.farFirstJ;
+                m.farCells = g_coverFar.data();
+            } else {
+                m.farSize = 0;
+                m.farCells = nullptr;
+            }
+
+            // The zones' values at a point (bilinear between chunk centres), the player's zone beyond.
+            auto zonesAt = [&](float x, float y, float out[3]) {
+                out[0] = m.outside[0];
+                out[1] = m.outside[1];
+                out[2] = m.outside[2];
+
+                if (!far) {
+                    return;
+                }
+
+                const float u = x / now.farCell - 0.5f, v = y / now.farCell - 0.5f;
+                const int i0 = static_cast<int>(std::floor(u)), j0 = static_cast<int>(std::floor(v));
+                const float fx = u - i0, fy = v - j0;
+                float sum[3] = {}, sw = 0.0f;
+
+                for (int q = 0; q < 4; q++) {
+                    const int i = i0 + (q & 1), j = j0 + (q >> 1);
+
+                    if (i < now.farFirstI || i >= now.farFirstI + now.farSize || j < now.farFirstJ || j >= now.farFirstJ + now.farSize) {
+                        continue;
+                    }
+
+                    const float w = ((q & 1) ? fx : 1.0f - fx) * ((q >> 1) ? fy : 1.0f - fy);
+                    const int mi = ((i % now.farSize) + now.farSize) % now.farSize, mj = ((j % now.farSize) + now.farSize) % now.farSize;
+                    const float* c = &g_coverFar[static_cast<size_t>(mj * now.farSize + mi) * 4];
+
+                    for (int k = 0; k < 3; k++) {
+                        sum[k] += w * c[k];
+                    }
+
+                    sw += w;
+                }
+
+                for (int k = 0; k < 3; k++) {
+                    out[k] = sum[k] + (1.0f - sw) * out[k];
+                }
+            };
+
+            // The grid: each spot's own values, fading into the zones' over its last yards; spots not
+            // known yet take the zones'.
+            for (int b = 0; b < kSize; b++) {
+                for (int a = 0; a < kSize; a++) {
+                    const int i = g_firstI + a, j = g_firstJ + b;
+                    const float x = (i + 0.5f) * kCell, y = (j + 0.5f) * kCell;
+                    float* out = &g_coverNear[static_cast<size_t>(SlotOf(i, j)) * 4];
+                    float zones[3];
+                    zonesAt(x, y, zones);
+                    out[0] = zones[0];
+                    out[1] = zones[1];
+                    out[2] = zones[2];
+                    out[3] = kNoWater;
+                    const Cell* c = Live(a, b);
+
+                    if (!c || !c->snowStarted || !c->started) {
+                        continue;
+                    }
+
+                    const float edge = std::fmin(std::fmin(a + 0.5f, kSize - a - 0.5f), std::fmin(b + 0.5f, kSize - b - 0.5f)) * kCell;
+                    const float inner = Clamp01(edge / kSnowEdgeFade);
+                    const float own[3] = { c->fallen, c->keep, Clamp01(c->value - c->rest) };
+
+                    for (int k = 0; k < 3; k++) {
+                        out[k] = zones[k] + (own[k] - zones[k]) * inner;
+                    }
+
+                    // The water line: a submerged spot's own surface, else the nearest water's within 12 yd.
+                    if (c->submerged) {
+                        out[3] = c->waterZ;
+                    } else if (c->waterDist >= 0.0f && c->waterDist <= 12.0f) {
+                        out[3] = c->z - c->aboveWater;
+                    }
+                }
+            }
+
+            m.size = kSize;
+            m.cellSize = kCell;
+            m.firstI = g_firstI;
+            m.firstJ = g_firstJ;
+            m.cells = g_coverNear.data();
+            m.version++;
+        }
+
         // Zone borders as gradients: per cell, the share of the player's zone around it (rain falls by
         // it), the mix of the zones' rain soak around it (the ground follows it), and the zones' fallen
         // snow around it. A separable box blur (running sums), weighted by which cells are known.
@@ -813,6 +930,7 @@ namespace ia::fields {
 
             g_wet.version++;
             PublishSnow();
+            BuildCoverMaps();
             g_stats.tickMs = NowMs() - t0;
         }
 
@@ -946,6 +1064,8 @@ namespace ia::fields {
 
     const WetGrid& Wet() { return g_wet; }
 
+    const CoverMaps& CoverGround() { return g_coverMaps; }
+
     void SnowAt(float x, float y, float& fallen, float& keep) {
         const SnowMap& p = g_snowPub;
         fallen = 0.0f;
@@ -1056,6 +1176,11 @@ namespace ia::fields {
         std::fill(g_snowNow.fallen.begin(), g_snowNow.fallen.end(), -1.0f);
         g_snowPub = SnowMap{};
         g_snowVersion++;
+        g_coverMaps.size = 0;
+        g_coverMaps.cells = nullptr;
+        g_coverMaps.farSize = 0;
+        g_coverMaps.farCells = nullptr;
+        g_coverMaps.version++;
     }
 
     void Update(float dt, const world::Snapshot& snap) {
