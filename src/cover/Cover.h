@@ -16,7 +16,11 @@ namespace ia::cover {
     struct Look {
         bool enabled = true;
         bool fallenSnow = true;
-        int debug = 0;               // 0 off, 1 what lies where, 2 wetness, 3 entries, 4 the maps' reach
+        bool depth = true;           // the terrain raised onto the covers (tessellation, where the GPU has it)
+        float tessDetail = 0.015f;   // yd per segment per yd of distance (smaller: finer, more GPU)
+        float tessReach = 250.0f;    // yd: subdivided within this
+        int tessMost = 16;           // segments per triangle edge at most
+        int debug = 0;               // 0 off, 1 what lies where, 2 wetness, 3 entries, 4 the maps' reach, 5 the height
         float brightness = 0.93f;    // a plain cover's colour
         float wetDarkening = 0.45f;  // how much darker soaked ground gets (WXL's terrain wetness strength)
         float thinDepth = 0.08f;     // yd: fallen snow hides the ground below from this depth

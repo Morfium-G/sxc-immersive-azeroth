@@ -88,10 +88,22 @@ namespace ia::ui {
         ImGui::Checkbox("Covers", &look.enabled);
         ImGui::SameLine();
         ImGui::Checkbox("Fallen snow", &look.fallenSnow);
+        ImGui::SameLine();
+        ImGui::Checkbox("Depth", &look.depth);
+        ImGui::SetItemTooltip("The terrain raised onto the covers (tessellation, where the GPU has it). Off: the flat look.");
+
+        if (look.depth) {
+            ImGui::SliderFloat("Detail (yd per segment per yd of distance)", &look.tessDetail, 0.004f, 0.06f, "%.3f");
+            ImGui::SetItemTooltip("Smaller: finer near the camera, more GPU. 0.015: a 0.15 yd segment at 10 yd.");
+            ImGui::SliderFloat("Subdivided within", &look.tessReach, 30.0f, 600.0f, "%.0f yd");
+            ImGui::SliderInt("Segments per edge at most", &look.tessMost, 1, 32);
+        }
+
         ImGui::SetNextItemWidth(200.0f);
-        ImGui::Combo("Debug view", &look.debug, "off\0what lies where\0wetness\0entries\0the maps' reach\0");
+        ImGui::Combo("Debug view", &look.debug, "off\0what lies where\0wetness\0entries\0the maps' reach\0the height\0");
         ImGui::SetItemTooltip("What lies where: red bare, green painted cover, white fallen snow, blue under the water line.\n"
-                              "The maps' reach: green the near grid (2 yd), blue per chunk, grey the player's zone beyond.");
+                              "The maps' reach: green the near grid (2 yd), blue per chunk, grey the player's zone beyond.\n"
+                              "The height: black flat .. white 0.5 yd above the terrain; red where the chunk isn't raised.");
         ImGui::SliderFloat("Plain cover colour", &look.brightness, 0.3f, 1.0f, "%.2f");
         ImGui::SliderFloat("Wet darkening", &look.wetDarkening, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Fallen snow hides the ground from", &look.thinDepth, 0.005f, 0.5f, "%.3f yd");

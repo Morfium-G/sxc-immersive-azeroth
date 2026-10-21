@@ -59,6 +59,7 @@ namespace ia::cover {
             e.moisture_min = v.moistureMin;
             e.rest_moisture = materials::Get(v.material).restMoisture;
             e.texture = v.coverTexture >= 1 && v.coverTexture <= SXC_COVER_MAX_TEXTURES ? v.coverTexture : 0;
+            e.z_offset = v.zOffset;
             // SurfaceCover's water and vertex colour flags are sxc.cover's bits.
             e.flags = (v.flags & (covertable::kFlagPreventUnderwater | covertable::kFlagPreventOnLand | covertable::kFlagUseVertexColor)) |
                       (snow ? SXC_COVER_SNOW : 0u);
@@ -138,6 +139,9 @@ namespace ia::cover {
             look.breakup_scale = g_look.breakupScale;
             look.drift_scale = g_look.driftScale;
             look.texture_tile = 0.0f; // the terrain layers'
+            look.tess_detail = g_look.depth ? g_look.tessDetail : 0.0f;
+            look.tess_reach = g_look.tessReach;
+            look.tess_most = static_cast<float>(g_look.tessMost);
 
             for (int k = 0; k < 3; k++) {
                 look.outside[k] = maps.outside[k];
