@@ -102,9 +102,21 @@ namespace ia::ui {
                                   "A fine trail fills back in by the cover's RelaxSeconds; a coarse one, half as deep, stays for the persist time.");
 
             if (look.trails) {
+                ImGui::SetNextItemWidth(200.0f);
+                ImGui::Combo("Feet carve", &look.trailCarve, "through the cover\0near contact\0up to a height\0");
+                ImGui::SetItemTooltip("The cover is pressed down only to the foot's own height, so a foot above the surface leaves nothing.\n"
+                                      "Through the cover: wherever the foot is; its swing through deep cover leaves a drag line between\n"
+                                      "  the prints (rims only near contact).\n"
+                                      "Near contact: only within 0.1 yd of the foot's height at its last step: clean prints.\n"
+                                      "Up to a height: below the height set here (the first version, 0.3 yd).");
+
+                if (look.trailCarve == 2) {
+                    ImGui::SliderFloat("Carves up to", &look.trailLift, 0.0f, 1.5f, "%.2f yd");
+                }
+
                 ImGui::SliderFloat("Trails stay (coarse)", &look.trailPersist, 30.0f, 3600.0f, "%.0f s");
-                ImGui::SliderFloat("Slurred by depth", &look.trailSlur, 0.0f, 2.0f, "%.2f");
-                ImGui::SetItemTooltip("yd of edge softening per yd of cover depth: deep snow leaves soft, slurred trails.");
+                ImGui::SliderFloat("Soft edges by depth", &look.trailSlur, 0.0f, 2.0f, "%.2f");
+                ImGui::SetItemTooltip("yd of edge softening per yd of cover depth: deep snow leaves soft, rounded trail edges.");
                 ImGui::SliderFloat("x rim", &look.trailRim, 0.0f, 3.0f, "%.2f");
                 ImGui::SliderFloat("Units within", &look.trailReach, 5.0f, 48.0f, "%.0f yd");
             }

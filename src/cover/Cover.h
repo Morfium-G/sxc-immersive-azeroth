@@ -25,6 +25,8 @@ namespace ia::cover {
         float trailSlur = 0.6f;      // yd of edge softening per yd of cover depth (deep snow: slurred trails)
         float trailRim = 1.0f;       // x the rows' rims
         float trailReach = 45.0f;    // yd: units this close to the player leave trails
+        int trailCarve = 1;          // where a foot carves: 0 through the cover, 1 near contact, 2 up to trailLift (SXC_COVER_CARVE_*)
+        float trailLift = 0.3f;      // yd above the unit: mode 2's height
         int debug = 0;               // 0 off, 1 what lies where, 2 wetness, 3 entries, 4 the maps' reach, 5 the height, 6 trails
         float brightness = 0.93f;    // a plain cover's colour
         float wetDarkening = 0.45f;  // how much darker soaked ground gets (WXL's terrain wetness strength)

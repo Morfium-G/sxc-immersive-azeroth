@@ -150,6 +150,8 @@ namespace ia::cover {
             look.trail_slur = g_look.trailSlur;
             look.trail_rim = g_look.trailRim;
             look.trail_reach = g_look.trailReach;
+            look.trail_carve = g_look.trailCarve;
+            look.trail_lift = g_look.trailLift;
 
             for (int k = 0; k < 3; k++) {
                 look.outside[k] = maps.outside[k];
