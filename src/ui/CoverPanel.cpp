@@ -123,12 +123,14 @@ namespace ia::ui {
         }
 
         ImGui::SetNextItemWidth(200.0f);
-        ImGui::Combo("Debug view", &look.debug, "off\0what lies where\0wetness\0entries\0the maps' reach\0the height\0trails\0");
+        ImGui::Combo("Debug view", &look.debug, "off\0what lies where\0wetness\0entries\0the maps' reach\0the height\0trails\0decals\0");
         ImGui::SetItemTooltip("What lies where: red bare, green painted cover, white fallen snow, blue under the water line.\n"
                               "The maps' reach: green the near grid (2 yd), blue per chunk, grey the player's zone beyond.\n"
                               "The height: black flat .. white 0.5 yd above the terrain; red where the chunk isn't raised.\n"
                               "Trails: red the fine layer, blue the remembered (coarse) one, magenta both, as the GPU reads\n"
-                              "them here; white / black lines their windows' edges (fine / coarse).");
+                              "them here; white / black lines their windows' edges (fine / coarse).\n"
+                              "Decals: projected textures' boxes painted solid: red no terrain depth, yellow no raised cover,\n"
+                              "green / cyan the decal's coordinates, blue outside the decal (the rest of the view as normal).");
         ImGui::SliderFloat("Plain cover colour", &look.brightness, 0.3f, 1.0f, "%.2f");
         ImGui::SliderFloat("Wet darkening", &look.wetDarkening, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Fallen snow hides the ground from", &look.thinDepth, 0.005f, 0.5f, "%.3f yd");
