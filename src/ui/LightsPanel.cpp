@@ -31,8 +31,10 @@ namespace ia::ui {
         ImGui::Text("In range: %u, merged: %u, drawn: %u%s%s", st.in_range, st.merged, st.active, st.dropped ? " (over 512: farthest left out)" : "", off);
         ImGui::Text("Indoors: %u (located this frame: %u lights, %u models)%s", st.indoor, st.indoor_tests, st.model_tests, off);
         ImGui::Text("Grid: %u x %u, busiest cell: %u, cells over limit: %u%s", st.cells, st.cells, st.busiest_cell, st.full_cells, off);
+        ImGui::Text("Shadows: %u lights (of %u maps), waiting: %u%s", st.shadowed, st.shadow_slots, st.shadow_waiting, off);
+        ImGui::Text("Shadow maps drawn: %u (%u triangles)%s", st.shadow_draws, st.shadow_triangles, off);
 
-        ImGui::TextDisabled("Now: the terrain and its covers, per pixel. Next: models and WMOs, then the light editor.");
+        ImGui::TextDisabled("Now: terrain, models and WMOs per pixel, with shadows. Next: the light editor.");
 
         ImGui::SeparatorText("Settings (not saved)");
         ImGui::Checkbox("Our lights", &s.enabled);
@@ -44,7 +46,17 @@ namespace ia::ui {
         ImGui::Checkbox("Inside and outside apart", &s.separateIndoor);
         ImGui::SetItemTooltip("A light inside an indoor WMO group (a tavern, a crypt) lights only indoor surfaces; one outside only the terrain\n"
                               "and outdoor WMO groups; a model takes the lights of the side it stands on. Keeps lamps from shining through\n"
-                              "outer walls; walls between rooms, floors and outdoor-only WMOs come with the lights' shadows.");
+                              "outer walls. Lights with a shadow map skip this guess (their walls, floors and roofs are in the map).");
+        ImGui::Checkbox("Shadows", &s.shadows);
+        ImGui::SetItemTooltip("The nearest lights that stand still get a cube shadow map of the WMOs and the terrain around them:\n"
+                              "walls between rooms, floors, roofs. Drawn once, redrawn when the light moves or a WMO near it finishes\n"
+                              "loading. Models (doodads, units) cast none. Glass and other see-through WMO faces let the light through.");
+        ImGui::SetNextItemWidth(200.0f);
+        ImGui::SliderInt("Lights with shadows", &s.shadowCount, 0, 64);
+        ImGui::SetItemTooltip("The nearest this many (up to the maps the device holds).");
+        ImGui::SetNextItemWidth(200.0f);
+        ImGui::SliderInt("Shadow maps per frame", &s.shadowUpdates, 1, 16);
+        ImGui::SetItemTooltip("How many maps are drawn at most in one frame (new lights, moved ones, changed surroundings).");
         ImGui::SetNextItemWidth(200.0f);
         ImGui::Combo("Debug view", &s.debug, "off\0our lights only\0the cell's count\0");
         ImGui::SetItemTooltip("Our lights only: the terrain grey, lit by our lights alone.\n"

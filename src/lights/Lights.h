@@ -22,6 +22,9 @@ namespace ia::lights {
         float flicker = 0.15f;       // 0..1 how much a flame dips
         float flickerSpeed = 1.0f;   // x the default pace
         bool separateIndoor = true;  // a light inside an indoor WMO group lights only indoor surfaces, one outside only outdoor ones
+        bool shadows = true;         // the nearest still lights get a cube shadow map of the WMOs and the terrain
+        int shadowCount = 32;        // lights with a map at most (the nearest)
+        int shadowUpdates = 4;       // maps drawn per frame at most
     };
     Settings& Config();
 

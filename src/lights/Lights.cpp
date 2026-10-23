@@ -110,6 +110,9 @@ namespace ia::lights {
             s.flicker = g_settings.flicker;
             s.flicker_speed = g_settings.flickerSpeed;
             s.separate_indoor = g_settings.separateIndoor ? WXL_TRUE : WXL_FALSE;
+            s.shadows = g_settings.shadows ? WXL_TRUE : WXL_FALSE;
+            s.shadow_count = g_settings.shadowCount;
+            s.shadow_updates = g_settings.shadowUpdates;
             api->set_settings(&s);
         }
     }
