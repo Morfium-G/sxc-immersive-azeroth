@@ -26,6 +26,7 @@
 #include "fog/Fog.h"
 #include "fog/FogSettings.h"
 #include "imgui.h"
+#include "grass/Grass.h"
 #include "lights/Lights.h"
 #include "sky/Bodies.h"
 #include "sky/BodyTables.h"
@@ -144,6 +145,7 @@ namespace {
             sxc::ui::AddPanel(module, "Cover", ia::ui::DrawCover);
             sxc::ui::AddPanel(module, "Lights", ia::ui::DrawLights);
             sxc::ui::AddPanel(module, "Light editor", ia::ui::DrawLightEditor);
+            sxc::ui::AddPanel(module, "Grass", ia::ui::DrawGrass);
 
             char line[160];
             std::snprintf(line, sizeof(line), "ready: tables registered, sky provider %s, overlay module %s", ia::sky::Api() ? "set" : "unavailable",
@@ -177,6 +179,7 @@ namespace {
                     ia::fog::Stop();
                     ia::cover::Stop();
                     ia::lights::Stop();
+                    ia::grass::Stop();
                     ia::fog::Reset();
                     ia::fields::Reset();
                     ia::regional::Reset();
@@ -191,6 +194,7 @@ namespace {
             ia::materials::Update();
             ia::covertable::Update();
             ia::wind::Update(dt, snap);
+            ia::grass::Update(dt, snap);
             ia::regional::Update(dt, snap);
             ia::fields::Update(dt, snap);
             ia::fogsettings::Update();

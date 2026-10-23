@@ -10,4 +10,5 @@ namespace ia::ui {
     void DrawCover(void* user);
     void DrawLights(void* user);
     void DrawLightEditor(void* user);
+    void DrawGrass(void* user);
 }
