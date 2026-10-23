@@ -21,6 +21,7 @@ namespace ia::lights {
         float mergeDistance = 1.0f;  // yd: closer lights merge
         float flicker = 0.15f;       // 0..1 how much a flame dips
         float flickerSpeed = 1.0f;   // x the default pace
+        bool separateIndoor = true;  // a light inside an indoor WMO group lights only indoor surfaces, one outside only outdoor ones
     };
     Settings& Config();
 

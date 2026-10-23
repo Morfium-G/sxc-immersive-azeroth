@@ -109,6 +109,7 @@ namespace ia::lights {
             s.merge_distance = g_settings.mergeDistance;
             s.flicker = g_settings.flicker;
             s.flicker_speed = g_settings.flickerSpeed;
+            s.separate_indoor = g_settings.separateIndoor ? WXL_TRUE : WXL_FALSE;
             api->set_settings(&s);
         }
     }

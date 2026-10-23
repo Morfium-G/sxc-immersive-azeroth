@@ -29,6 +29,7 @@ namespace ia::ui {
         ImGui::Text("Models' own lights: %u (%u placed by the client)%s", st.model_lights, st.placed, off);
         ImGui::Text("Models suppressed: %u%s", st.suppressed, off);
         ImGui::Text("In range: %u, merged: %u, drawn: %u%s%s", st.in_range, st.merged, st.active, st.dropped ? " (over 512: farthest left out)" : "", off);
+        ImGui::Text("Indoors: %u (located this frame: %u lights, %u models)%s", st.indoor, st.indoor_tests, st.model_tests, off);
         ImGui::Text("Grid: %u x %u, busiest cell: %u, cells over limit: %u%s", st.cells, st.cells, st.busiest_cell, st.full_cells, off);
 
         ImGui::TextDisabled("Now: the terrain and its covers, per pixel. Next: models and WMOs, then the light editor.");
@@ -40,6 +41,10 @@ namespace ia::ui {
         ImGui::SetItemTooltip("The client lights each terrain chunk with its 3 nearest point lights, per vertex: only the models' own lights\n"
                               "(rare in 3.3.5: held torches and a few others). Ours replace them while on. Independent of a table row's\n"
                               "\"suppress\" flag, which leaves a model's own lights out of ours.");
+        ImGui::Checkbox("Inside and outside apart", &s.separateIndoor);
+        ImGui::SetItemTooltip("A light inside an indoor WMO group (a tavern, a crypt) lights only indoor surfaces; one outside only the terrain\n"
+                              "and outdoor WMO groups; a model takes the lights of the side it stands on. Keeps lamps from shining through\n"
+                              "outer walls; walls between rooms, floors and outdoor-only WMOs come with the lights' shadows.");
         ImGui::SetNextItemWidth(200.0f);
         ImGui::Combo("Debug view", &s.debug, "off\0our lights only\0the cell's count\0");
         ImGui::SetItemTooltip("Our lights only: the terrain grey, lit by our lights alone.\n"
