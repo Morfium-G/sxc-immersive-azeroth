@@ -12,26 +12,24 @@ namespace ia::ui {
             return;
         }
 
-        // Short readout lines (the panel's text can't be copied).
+        // Short readout lines (the panel's text can't be copied), always the same lines so the settings
+        // below don't move when the lights are switched off.
         sxc_lights_stats st;
+        lights::Stats(st);
+        const char* off = s.enabled ? "" : " (off)";
+        ImGui::Text("Tables: %s", lights::TableStatus());
+        ImGui::Text("Table lights: %u%s", st.table_lights, off);
 
-        if (s.enabled && lights::Stats(st)) {
-            ImGui::Text("Tables: %s", lights::TableStatus());
-            ImGui::Text("Table lights: %u", st.table_lights);
-
-            if (st.attach_missing) {
-                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "Attachment missing: %u (placed at the model's origin)", st.attach_missing);
-            } else {
-                ImGui::Text("Attachment missing: 0");
-            }
-
-            ImGui::Text("Models' own lights: %u (%u placed by the client)", st.model_lights, st.placed);
-            ImGui::Text("Models suppressed: %u", st.suppressed);
-            ImGui::Text("In range: %u, merged: %u, drawn: %u%s", st.in_range, st.merged, st.active, st.dropped ? " (over 512: farthest left out)" : "");
-            ImGui::Text("Grid: %u x %u, busiest cell: %u, cells over limit: %u", st.cells, st.cells, st.busiest_cell, st.full_cells);
+        if (st.attach_missing) {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "Attachment missing: %u (placed at the model's origin; Logs\\sxc.log names them)", st.attach_missing);
         } else {
-            ImGui::TextWrapped("%s", lights::Status());
+            ImGui::Text("Attachment missing: 0%s", off);
         }
+
+        ImGui::Text("Models' own lights: %u (%u placed by the client)%s", st.model_lights, st.placed, off);
+        ImGui::Text("Models suppressed: %u%s", st.suppressed, off);
+        ImGui::Text("In range: %u, merged: %u, drawn: %u%s%s", st.in_range, st.merged, st.active, st.dropped ? " (over 512: farthest left out)" : "", off);
+        ImGui::Text("Grid: %u x %u, busiest cell: %u, cells over limit: %u%s", st.cells, st.cells, st.busiest_cell, st.full_cells, off);
 
         ImGui::TextDisabled("Now: the terrain and its covers, per pixel. Next: models and WMOs, then the light editor.");
 

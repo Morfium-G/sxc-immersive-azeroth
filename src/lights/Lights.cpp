@@ -72,6 +72,7 @@ namespace ia::lights {
 
                     row.light_id = r.Uint(light);
                     row.flags = r.Uint(flags);
+                    row.id = r.Id();
                     rows.push_back(row);
                 }
 
