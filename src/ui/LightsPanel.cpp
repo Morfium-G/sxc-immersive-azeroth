@@ -32,7 +32,7 @@ namespace ia::ui {
         ImGui::Text("Indoors: %u (located this frame: %u lights, %u models)%s", st.indoor, st.indoor_tests, st.model_tests, off);
         ImGui::Text("Grid: %u x %u, busiest cell: %u, cells over limit: %u%s", st.cells, st.cells, st.busiest_cell, st.full_cells, off);
         ImGui::Text("Shadows: %u lights (of %u maps), waiting: %u%s", st.shadowed, st.shadow_slots, st.shadow_waiting, off);
-        ImGui::Text("Shadow maps drawn: %u (%u triangles)%s", st.shadow_draws, st.shadow_triangles, off);
+        ImGui::Text("Shadow maps drawn: %u (%u triangles, %u doodads)%s", st.shadow_draws, st.shadow_triangles, st.shadow_doodads, off);
 
         ImGui::TextDisabled("Now: terrain, models and WMOs per pixel, with shadows. Next: the light editor.");
 
@@ -50,7 +50,11 @@ namespace ia::ui {
         ImGui::Checkbox("Shadows", &s.shadows);
         ImGui::SetItemTooltip("The nearest lights that stand still get a cube shadow map of the WMOs and the terrain around them:\n"
                               "walls between rooms, floors, roofs. Drawn once, redrawn when the light moves or a WMO near it finishes\n"
-                              "loading. Models (doodads, units) cast none. Glass and other see-through WMO faces let the light through.");
+                              "loading. Units cast none (yet). Glass and other see-through WMO faces let the light through.");
+        ImGui::SameLine();
+        ImGui::Checkbox("Doodads cast", &s.shadowDoodads);
+        ImGui::SetItemTooltip("The placed doodads (furniture, barrels, fences, trees) cast too; leaves and fences by their texture's\n"
+                              "see-through parts. Glows, flames and glass cast nothing; nor does the model a light hangs on.");
         ImGui::SetNextItemWidth(200.0f);
         ImGui::SliderInt("Lights with shadows", &s.shadowCount, 0, 64);
         ImGui::SetItemTooltip("The nearest this many (up to the maps the device holds).");

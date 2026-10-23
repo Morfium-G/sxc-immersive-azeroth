@@ -23,8 +23,9 @@ namespace ia::lights {
         float flickerSpeed = 1.0f;   // x the default pace
         bool separateIndoor = true;  // a light inside an indoor WMO group lights only indoor surfaces, one outside only outdoor ones
         bool shadows = true;         // the nearest still lights get a cube shadow map of the WMOs and the terrain
-        int shadowCount = 32;        // lights with a map at most (the nearest)
+        int shadowCount = 64;        // lights with a map at most (the nearest; fewer looks odd where some lamps of a room cast and others don't)
         int shadowUpdates = 4;       // maps drawn per frame at most
+        bool shadowDoodads = true;   // the placed doodads cast too (leaves and fences by their texture's alpha)
     };
     Settings& Config();
 

@@ -115,6 +115,7 @@ namespace ia::lights {
             s.shadows = g_settings.shadows ? WXL_TRUE : WXL_FALSE;
             s.shadow_count = g_settings.shadowCount;
             s.shadow_updates = g_settings.shadowUpdates;
+            s.shadow_doodads = g_settings.shadowDoodads ? WXL_TRUE : WXL_FALSE;
             api->set_settings(&s);
         }
     }
