@@ -1,5 +1,6 @@
 #include "lights/Lights.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -26,7 +27,8 @@ namespace ia::lights {
             const sxc::data::Table& p = g_properties.Table();
             const sxc::data::Table& a = g_assignments.Table();
 
-            if (p.Loaded()) {
+            // A table without a file yet still counts: rows added in the editor show before the first save.
+            if (p) {
                 const int id = p.Field("ID"), type = p.Field("Type"), color = p.Field("Color"), intensity = p.Field("Intensity"), radius = p.Field("Radius"),
                           falloff = p.Field("Falloff"), inner = p.Field("InnerAngle"), outer = p.Field("OuterAngle"), mode = p.Field("FlickerMode"),
                           speed = p.Field("FlickerSpeed"), amount = p.Field("FlickerAmount"), flags = p.Field("Flags");
@@ -53,7 +55,7 @@ namespace ia::lights {
                 }
             }
 
-            if (a.Loaded()) {
+            if (a) {
                 const int path = a.Field("ModelPath"), type = a.Field("AttachType"), index = a.Field("AttachIndex"), offset = a.Field("Offset"),
                           direction = a.Field("Direction"), light = a.Field("LightID"), flags = a.Field("Flags");
                 paths.reserve(a.RowCount());
@@ -166,5 +168,10 @@ namespace ia::lights {
     const char* Status() {
         const sxc_lights_api* api = Api();
         return api ? api->status() : "the client has no sxc.lights (update the client)";
+    }
+
+    const sxc_lights_api* EditorApi() {
+        const sxc_lights_api* api = Api();
+        return api && api->struct_size >= offsetof(sxc_lights_api, missing_rows) + sizeof(api->missing_rows) ? api : nullptr;
     }
 }

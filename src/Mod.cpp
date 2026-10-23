@@ -143,6 +143,7 @@ namespace {
             sxc::ui::AddPanel(module, "Fog", ia::ui::DrawFog);
             sxc::ui::AddPanel(module, "Cover", ia::ui::DrawCover);
             sxc::ui::AddPanel(module, "Lights", ia::ui::DrawLights);
+            sxc::ui::AddPanel(module, "Light editor", ia::ui::DrawLightEditor);
 
             char line[160];
             std::snprintf(line, sizeof(line), "ready: tables registered, sky provider %s, overlay module %s", ia::sky::Api() ? "set" : "unavailable",

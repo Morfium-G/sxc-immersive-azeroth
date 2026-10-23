@@ -38,4 +38,8 @@ namespace ia::lights {
     const char* Status();  // the client's line
     const char* TableStatus(); // the two tables as last sent
     bool Stats(sxc_lights_stats& out); // the client's numbers for last frame
+
+    // The service with the light editor's queries (models near, their points, last frame's lights,
+    // rows missing their attachment); null on an older client.
+    const sxc_lights_api* EditorApi();
 }
