@@ -8,4 +8,5 @@ namespace ia::ui {
     void DrawGround(void* user);
     void DrawFog(void* user);
     void DrawCover(void* user);
+    void DrawLights(void* user);
 }

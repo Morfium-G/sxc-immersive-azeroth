@@ -1,0 +1,68 @@
+#include "ui/Panels.h"
+
+#include "imgui.h"
+#include "lights/Lights.h"
+
+namespace ia::ui {
+    void DrawLights(void*) {
+        lights::Settings& s = lights::Config();
+
+        if (!lights::Available()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "The client doesn't draw our lights: %s", lights::Status());
+            return;
+        }
+
+        // Short readout lines (the panel's text can't be copied).
+        sxc_lights_stats st;
+
+        if (s.enabled && lights::Stats(st)) {
+            ImGui::Text("Tables: %s", lights::TableStatus());
+            ImGui::Text("Table lights: %u", st.table_lights);
+
+            if (st.attach_missing) {
+                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "Attachment missing: %u (placed at the model's origin)", st.attach_missing);
+            } else {
+                ImGui::Text("Attachment missing: 0");
+            }
+
+            ImGui::Text("Models' own lights: %u (%u placed by the client)", st.model_lights, st.placed);
+            ImGui::Text("Models suppressed: %u", st.suppressed);
+            ImGui::Text("In range: %u, merged: %u, drawn: %u%s", st.in_range, st.merged, st.active, st.dropped ? " (over 512: farthest left out)" : "");
+            ImGui::Text("Grid: %u x %u, busiest cell: %u, cells over limit: %u", st.cells, st.cells, st.busiest_cell, st.full_cells);
+        } else {
+            ImGui::TextWrapped("%s", lights::Status());
+        }
+
+        ImGui::TextDisabled("Now: the terrain and its covers, per pixel. Next: models and WMOs, then the light editor.");
+
+        ImGui::SeparatorText("Settings (not saved)");
+        ImGui::Checkbox("Our lights", &s.enabled);
+        ImGui::SameLine();
+        ImGui::Checkbox("Stock terrain lights off", &s.stockOff);
+        ImGui::SetItemTooltip("The client lights each terrain chunk with its 3 nearest point lights, per vertex: only the models' own lights\n"
+                              "(rare in 3.3.5: held torches and a few others). Ours replace them while on. Independent of a table row's\n"
+                              "\"suppress\" flag, which leaves a model's own lights out of ours.");
+        ImGui::SetNextItemWidth(200.0f);
+        ImGui::Combo("Debug view", &s.debug, "off\0our lights only\0the cell's count\0");
+        ImGui::SetItemTooltip("Our lights only: the terrain grey, lit by our lights alone.\n"
+                              "The cell's count: red the lights reaching the pixel, green the lights its grid cell lists,\n"
+                              "both as a share of what a cell holds (full green: the cell is full, some may be left out).");
+
+        ImGui::SliderFloat("Default radius", &s.radius, 2.0f, 40.0f, "%.1f yd");
+        ImGui::SetItemTooltip("A light is exactly 0 here. Only for lights without a Radius of their own (table rows with -1, the models' own lights).\n"
+                              "The stock torches fall to 5%% at about 13 yd.");
+        ImGui::SliderFloat("Brightness", &s.brightness, 0.0f, 4.0f, "%.2f");
+        ImGui::SliderFloat("Flicker", &s.flicker, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Flicker pace", &s.flickerSpeed, 0.1f, 4.0f, "%.2f");
+        ImGui::SliderFloat("Merge within", &s.mergeDistance, 0.0f, 3.0f, "%.2f yd");
+        ImGui::SetItemTooltip("Closer lights become one (Blizzard places torches in groups of three).");
+
+        ImGui::SeparatorText("Grid");
+        ImGui::SliderFloat("Range", &s.range, 32.0f, 512.0f, "%.0f yd");
+        ImGui::SetItemTooltip("No lights beyond this from the camera; they fade out over its last third.");
+        ImGui::SliderFloat("Cell size", &s.cellSize, 4.0f, 32.0f, "%.0f yd");
+        ImGui::SetItemTooltip("The grid reaches the range, 64 cells per side at most (larger cells past that).");
+        ImGui::SliderInt("Lights per cell", &s.maxPerCell, 1, 32);
+        ImGui::SetItemTooltip("Each pixel loops over its cell's lights; a fuller cell keeps the strongest at its middle.");
+    }
+}
