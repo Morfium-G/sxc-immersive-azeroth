@@ -1,0 +1,21 @@
+  <Table Name="SkyPath" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Name" Type="string" />
+    <Field Name="Type" Type="int" />
+    <Field Name="Frame" Type="int" />
+    <Field Name="RiseAzimuth" Type="float" />
+    <Field Name="Lift" Type="float" />
+    <Field Name="Height" Type="float" />
+    <Field Name="FollowBody" Type="int" />
+    <Field Name="SeparationMin" Type="float" />
+    <Field Name="SeparationMax" Type="float" />
+    <Field Name="SeparationDays" Type="float" />
+    <Field Name="SeparationAngle" Type="float" />
+    <Field Name="WobbleDegrees" Type="float" />
+    <Field Name="WobbleDays" Type="float" />
+    <Field Name="DriftDegreesPerDay" Type="float" />
+    <Field Name="SizePulse" Type="float" />
+    <Field Name="SizePulseDays" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+  </Table>

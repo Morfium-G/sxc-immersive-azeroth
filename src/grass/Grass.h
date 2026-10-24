@@ -11,7 +11,8 @@
 #include "World.h"
 
 namespace ia::grass {
-    // The settings (the Grass panel; not saved). WXL's defaults.
+    // The settings (the Grass panel), saved in [ImmersiveAzerothGrass] (WTF\SXC.ini; the overlay's Settings
+    // view shows them too). WXL's defaults.
     struct Settings {
         bool motion = true;
         float amplitude = 0.35f;     // yd the tips move at full wind

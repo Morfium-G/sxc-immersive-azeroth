@@ -5,10 +5,12 @@
 #include <cstdint>
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
+#include "SXC/Api/sxc_settings.hpp"
 #include "TableWatch.h"
 #include "env/Wind.h"
 #include "wxl/sdk.hpp"
@@ -16,6 +18,109 @@
 namespace ia::grass {
     namespace {
         Settings g_settings;
+
+        // --- saved settings ([ImmersiveAzerothGrass]) -------------------------------------------------------
+        // The panel edits g_settings; once a frame a changed value goes to its setting, and a change made in
+        // the overlay's Settings view comes back. Declared on first use (after WXL_STAGE_READY).
+        struct SavedField {
+            const char* key;
+            const char* label;
+            const char* help;
+            bool Settings::*flag;    // a switch, or
+            float Settings::*value;  // a number in min..max
+            float min, max;
+        };
+
+        const SavedField kSaved[] = {
+            { "Motion", "Grass: wind and parting", "Grass sways in the wind and parts around characters.", &Settings::motion, nullptr, 0, 1 },
+            { "Sway", "Grass: sway", "Yards the tips move at full wind.", nullptr, &Settings::amplitude, 0.0f, 1.5f },
+            { "Flutter", "Grass: flutter", "Yards of extra per-blade shimmer, stronger in gusts.", nullptr, &Settings::flutter, 0.0f, 0.5f },
+            { "FlutterSpeed", "Grass: flutter speed", "Radians a second.", nullptr, &Settings::flutterSpeed, 0.0f, 10.0f },
+            { "StiffBase", "Grass: stiff base", "The bottom share of each blade that never moves.", nullptr, &Settings::anchor, 0.0f, 0.9f },
+            { "Push", "Grass: push", "Yards grass leans away from characters.", nullptr, &Settings::pushStrength, 0.0f, 2.0f },
+            { "PushRadiusScale", "Grass: push radius x", "Push radius as a multiple of a character's size.", nullptr, &Settings::radiusScale, 0.5f, 5.0f },
+            { "PushRadiusMin", "Grass: smallest push radius", "Yards.", nullptr, &Settings::minRadius, 0.1f, 3.0f },
+            { "PushMountedScale", "Grass: mounted push x", "The push radius of a mounted character x this.", nullptr, &Settings::mountedScale, 1.0f, 4.0f },
+            { "Density", "Grass: denser near you", "Extra plants near you, as GroundEffectDoodadDensity says (the limits below cap it).", &Settings::density, nullptr, 0, 1 },
+            { "DensityMax", "Grass: most density", "Plants drawn per placed plant, at most (the tables are written for up to 8).", nullptr, &Settings::maxMultiplier, 1.0f, 8.0f },
+            { "DensityRadius", "Grass: most density radius", "Yards around you grass gets denser, at most (full density within half of it).", nullptr, &Settings::maxRadius, 0.0f, 1024.0f },
+            { "DensitySpread", "Grass: most spread", "Yards an extra plant may move from its plant, at most (it stays on the plant's terrain triangle).", nullptr, &Settings::maxSpread, 0.0f, 6.0f },
+            { "Edges", "Grass: soft edges", "Where grass meets bare ground, plants near the border shrink and a few spill onto it.", &Settings::edges, nullptr, 0, 1 },
+            { "EdgeBand", "Grass: edge shrink band", "Yards inside the border over which plants shrink (0: none).", nullptr, &Settings::edgeBand, 0.0f, 4.0f },
+            { "EdgeSize", "Grass: size at the border", "Plant size right at the border.", nullptr, &Settings::edgeShrink, 0.1f, 1.0f },
+            { "EdgeSpill", "Grass: edge spill", "Yards plants spill onto the bare ground (0: none), smaller the farther out.", nullptr, &Settings::edgeSpill, 0.0f, 8.0f },
+            { "EdgeSpillShare", "Grass: edge spill share", "Spilled plants per plant near the border.", nullptr, &Settings::edgeShare, 0.0f, 4.0f },
+            { "EdgeSameTexture", "Grass: spill on the same texture only", "Spill only onto bare ground painted with the same terrain texture.", &Settings::edgeSameTexture, nullptr, 0, 1 },
+        };
+        constexpr size_t kSavedCount = sizeof(kSaved) / sizeof(kSaved[0]);
+
+        struct SavedHandle {
+            std::unique_ptr<sxc::settings::Bool> flag;
+            std::unique_ptr<sxc::settings::Float> value;
+            float last = 0.0f;   // the value both sides agreed on
+        };
+        std::vector<SavedHandle> g_saved;
+
+        float Read(const Settings& s, const SavedField& f) { return f.flag ? (s.*f.flag ? 1.0f : 0.0f) : s.*f.value; }
+
+        void Write(Settings& s, const SavedField& f, float v) {
+            if (f.flag) {
+                s.*f.flag = v != 0.0f;
+            } else {
+                s.*f.value = v;
+            }
+        }
+
+        void SyncSaved() {
+            if (!sxc::settings::Api()) {
+                return;
+            }
+
+            if (g_saved.empty()) {
+                const Settings defaults;
+                g_saved.resize(kSavedCount);
+
+                for (size_t i = 0; i < kSavedCount; i++) {
+                    const SavedField& f = kSaved[i];
+                    SavedHandle& h = g_saved[i];
+
+                    if (f.flag) {
+                        h.flag = std::make_unique<sxc::settings::Bool>("ImmersiveAzerothGrass", f.key, defaults.*f.flag, f.label, f.help);
+                        h.last = h.flag->Get() ? 1.0f : 0.0f;
+                    } else {
+                        h.value = std::make_unique<sxc::settings::Float>("ImmersiveAzerothGrass", f.key, defaults.*f.value, f.min, f.max, f.label, f.help);
+                        h.last = h.value->Get();
+                    }
+
+                    Write(g_settings, f, h.last);
+                }
+
+                return;
+            }
+
+            for (size_t i = 0; i < kSavedCount; i++) {
+                const SavedField& f = kSaved[i];
+                SavedHandle& h = g_saved[i];
+                const float panel = Read(g_settings, f);
+                const float stored = h.flag ? (h.flag->Get() ? 1.0f : 0.0f) : h.value->Get();
+
+                if (panel != h.last) {
+                    // The panel changed it.
+                    if (h.flag) {
+                        h.flag->Set(panel != 0.0f);
+                    } else {
+                        h.value->Set(panel);
+                    }
+
+                    h.last = h.flag ? panel : h.value->Get();
+                    Write(g_settings, f, h.last);
+                } else if (stored != h.last) {
+                    // The Settings view changed it.
+                    h.last = stored;
+                    Write(g_settings, f, stored);
+                }
+            }
+        }
         bool g_running = false;
         unsigned g_actorsFed = 0;
         TableWatch g_table("GroundEffectDoodadWind");
@@ -190,7 +295,10 @@ namespace ia::grass {
         }
     }
 
-    Settings& Config() { return g_settings; }
+    Settings& Config() {
+        SyncSaved();
+        return g_settings;
+    }
 
     const sxc_grass_api* Api() {
         static const sxc_grass_api* s_api =
@@ -199,6 +307,7 @@ namespace ia::grass {
     }
 
     void Update(float dt, const world::Snapshot& snap) {
+        SyncSaved();
         const sxc_grass_api* api = Api();
 
         if (!api) {

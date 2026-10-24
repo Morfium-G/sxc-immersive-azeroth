@@ -1,0 +1,7 @@
+  <Table Name="SkyBodySetMember" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="SetID" Type="int" />
+    <Field Name="BodyID" Type="int" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+  </Table>

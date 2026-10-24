@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Definition xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Table Name="AreaClimate" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="DayTemp" Type="float" />
+    <Field Name="NightTemp" Type="float" />
+    <Field Name="SeasonAmplitude" Type="float" />
+    <Field Name="SeasonOffset" Type="float" />
+    <Field Name="Humidity" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Fogginess" Type="float" />
+    <Field Name="Comment" Type="string" />
+    <Field Name="DayLength" Type="float" />
+  </Table>
+  <Table Name="DoodadLightAssignment" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ModelPath" Type="string" />
+    <Field Name="AttachType" Type="int" />
+    <Field Name="AttachIndex" Type="int" />
+    <Field Name="AttachName" Type="string" />
+    <Field Name="OffsetX" Type="float" />
+    <Field Name="OffsetY" Type="float" />
+    <Field Name="OffsetZ" Type="float" />
+    <Field Name="DirectionX" Type="float" />
+    <Field Name="DirectionY" Type="float" />
+    <Field Name="DirectionZ" Type="float" />
+    <Field Name="LightID" Type="int" />
+    <Field Name="Flags" Type="int" />
+  </Table>
+  <Table Name="DoodadLightProperties" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Name" Type="string" />
+    <Field Name="Type" Type="int" />
+    <Field Name="Color" Type="uint" />
+    <Field Name="Intensity" Type="float" />
+    <Field Name="Radius" Type="float" />
+    <Field Name="Falloff" Type="float" />
+    <Field Name="InnerAngle" Type="float" />
+    <Field Name="OuterAngle" Type="float" />
+    <Field Name="FlickerMode" Type="int" />
+    <Field Name="FlickerSpeed" Type="float" />
+    <Field Name="FlickerAmount" Type="float" />
+    <Field Name="Flags" Type="int" />
+  </Table>
+  <Table Name="FogSettings" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="Kind" Type="int" />
+    <Field Name="Strength" Type="float" />
+    <Field Name="Density" Type="float" />
+    <Field Name="Thickness" Type="float" />
+    <Field Name="BuildUp" Type="float" />
+    <Field Name="BurnOff" Type="float" />
+    <Field Name="WindThin" Type="float" />
+    <Field Name="WindDrift" Type="float" />
+    <Field Name="Patchiness" Type="float" />
+    <Field Name="Weight" Type="float" />
+    <Field Name="ColorMode" Type="int" />
+    <Field Name="ColorR" Type="float" />
+    <Field Name="ColorG" Type="float" />
+    <Field Name="ColorB" Type="float" />
+    <Field Name="Saturation" Type="float" />
+    <Field Name="Brightness" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+  </Table>
+  <Table Name="GroundEffectDoodadDensity" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="DoodadID" Type="int" />
+    <Field Name="GroundEffectID" Type="int" />
+    <Field Name="Multiplier" Type="float" />
+    <Field Name="Radius" Type="float" />
+    <Field Name="Spread" Type="float" />
+  </Table>
+  <Table Name="GroundEffectDoodadWind" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Stiffness" Type="float" />
+    <Field Name="RootV" Type="float" />
+    <Field Name="TipV" Type="float" />
+  </Table>
+  <Table Name="GroundMaterial" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Name" Type="string" />
+    <Field Name="Parent" Type="int" />
+    <Field Name="RestMoisture" Type="float" />
+    <Field Name="Stiffness" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Absorbency" Type="float" />
+    <Field Name="Temperature" Type="float" />
+  </Table>
+  <Table Name="GroundMaterialSelector" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="TexturePath" Type="string" />
+    <Field Name="GroundEffectID" Type="int" />
+    <Field Name="TerrainType" Type="int" />
+    <Field Name="LiquidType" Type="int" />
+    <Field Name="MaterialID" Type="int" />
+    <Field Name="Flags" Type="int" />
+  </Table>
+  <Table Name="SkyBody" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Name" Type="string" />
+    <Field Name="Texture" Type="string" />
+    <Field Name="StockRole" Type="int" />
+    <Field Name="Size" Type="float" />
+    <Field Name="Color" Type="uint" />
+    <Field Name="Blend" Type="int" />
+    <Field Name="Order" Type="int" />
+    <Field Name="PathID" Type="int" />
+    <Field Name="PeriodDays" Type="float" />
+    <Field Name="PhaseDays" Type="float" />
+    <Field Name="VisiblePeriodDays" Type="float" />
+    <Field Name="VisibleDays" Type="float" />
+    <Field Name="VisibleOffsetDays" Type="float" />
+    <Field Name="LitMode" Type="int" />
+    <Field Name="LitPeriodDays" Type="float" />
+    <Field Name="LightColor" Type="uint" />
+    <Field Name="LightStrength" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+    <Field Name="VisibleEase" Type="int" />
+    <Field Name="VisibleEaseSeconds" Type="float" />
+    <Field Name="Clock" Type="int" />
+    <Field Name="DayVisibility" Type="float" />
+    <Field Name="Rotation" Type="float" />
+    <Field Name="RotationPerDay" Type="float" />
+  </Table>
+  <Table Name="SkyBodySet" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Name" Type="string" />
+    <Field Name="ParentSet" Type="int" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+  </Table>
+  <Table Name="SkyBodySetMember" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="SetID" Type="int" />
+    <Field Name="BodyID" Type="int" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+  </Table>
+  <Table Name="SkyPath" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Name" Type="string" />
+    <Field Name="Type" Type="int" />
+    <Field Name="Frame" Type="int" />
+    <Field Name="RiseAzimuth" Type="float" />
+    <Field Name="Lift" Type="float" />
+    <Field Name="Height" Type="float" />
+    <Field Name="FollowBody" Type="int" />
+    <Field Name="SeparationMin" Type="float" />
+    <Field Name="SeparationMax" Type="float" />
+    <Field Name="SeparationDays" Type="float" />
+    <Field Name="SeparationAngle" Type="float" />
+    <Field Name="WobbleDegrees" Type="float" />
+    <Field Name="WobbleDays" Type="float" />
+    <Field Name="DriftDegreesPerDay" Type="float" />
+    <Field Name="SizePulse" Type="float" />
+    <Field Name="SizePulseDays" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+  </Table>
+  <Table Name="SkyPathKey" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="PathID" Type="int" />
+    <Field Name="Time" Type="float" />
+    <Field Name="Azimuth" Type="float" />
+    <Field Name="Elevation" Type="float" />
+    <Field Name="Size" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+    <Field Name="LeaderBrightness" Type="float" />
+    <Field Name="Order" Type="int" />
+  </Table>
+  <Table Name="SkyProfile" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="BodySet" Type="int" />
+    <Field Name="HideZoneSkybox" Type="int" />
+    <Field Name="HideAllSkyboxes" Type="int" />
+    <Field Name="NorthOffset" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+    <Field Name="LoreYear" Type="int" />
+    <Field Name="LoreWobbleYears" Type="float" />
+    <Field Name="LoreWobbleMode" Type="int" />
+    <Field Name="LoreYearsPerDay" Type="float" />
+    <Field Name="LoreStartDate" Type="int" />
+  </Table>
+  <Table Name="SkyTime" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="PinnedHour" Type="float" />
+    <Field Name="OffsetHours" Type="float" />
+    <Field Name="BlendSeconds" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+    <Field Name="PinnedDay" Type="int" />
+  </Table>
+  <Table Name="SurfaceCover" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="MaterialID" Type="int" />
+    <Field Name="CoverMaterial" Type="int" />
+    <Field Name="Depth" Type="float" />
+    <Field Name="MaxSlope" Type="float" />
+    <Field Name="SlopeFade" Type="float" />
+    <Field Name="DriftNoise" Type="float" />
+    <Field Name="EdgeBreakup" Type="float" />
+    <Field Name="Rim" Type="float" />
+    <Field Name="RelaxSeconds" Type="float" />
+    <Field Name="TintColor" Type="uint" />
+    <Field Name="TintStrength" Type="float" />
+    <Field Name="CoverTexture" Type="string" />
+    <Field Name="Opacity" Type="float" />
+    <Field Name="Flatten" Type="float" />
+    <Field Name="ZOffset" Type="float" />
+    <Field Name="Wetness" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="MeltKeptShare" Type="float" />
+    <Field Name="MeltGoneTemperature" Type="float" />
+    <Field Name="MoistureMin" Type="float" />
+  </Table>
+  <Table Name="WindProfile" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="GroundMin" Type="float" />
+    <Field Name="GroundMax" Type="float" />
+    <Field Name="AloftMin" Type="float" />
+    <Field Name="AloftMax" Type="float" />
+    <Field Name="AloftHeight" Type="float" />
+    <Field Name="WeatherInfluence" Type="float" />
+    <Field Name="GustStrength" Type="float" />
+    <Field Name="GustFrequency" Type="float" />
+    <Field Name="TerrainWeight" Type="float" />
+    <Field Name="LockedDirection" Type="float" />
+    <Field Name="LockStrength" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+  </Table>
+</Definition>

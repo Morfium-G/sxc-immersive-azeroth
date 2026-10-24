@@ -1,0 +1,16 @@
+  <Table Name="SkyProfile" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ScopeType" Type="int" />
+    <Field Name="ScopeID" Type="int" />
+    <Field Name="BodySet" Type="int" />
+    <Field Name="HideZoneSkybox" Type="int" />
+    <Field Name="HideAllSkyboxes" Type="int" />
+    <Field Name="NorthOffset" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+    <Field Name="LoreYear" Type="int" />
+    <Field Name="LoreWobbleYears" Type="float" />
+    <Field Name="LoreWobbleMode" Type="int" />
+    <Field Name="LoreYearsPerDay" Type="float" />
+    <Field Name="LoreStartDate" Type="int" />
+  </Table>

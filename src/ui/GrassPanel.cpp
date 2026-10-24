@@ -21,7 +21,7 @@ namespace ia::ui {
             ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "Only the instanced grass moves (Vulkan; the Info panel's switch).");
         }
 
-        ImGui::SeparatorText("Motion (not saved)");
+        ImGui::SeparatorText("Motion");
         ImGui::Checkbox("Wind and parting", &s.motion);
         ImGui::SliderFloat("Sway", &s.amplitude, 0.0f, 1.5f, "%.2f yd");
         ImGui::SetItemTooltip("How far the tips move at full wind.");
@@ -127,7 +127,7 @@ namespace ia::ui {
             }
         }
 
-        ImGui::SeparatorText("Density (not saved)");
+        ImGui::SeparatorText("Density");
         ImGui::Text("Table: %s", grass::DensityStatus());
         ImGui::Checkbox("Denser near you", &s.density);
         ImGui::SetItemTooltip("Extra plants near you, as GroundEffectDoodadDensity says; these are your limits on it.");
@@ -139,7 +139,7 @@ namespace ia::ui {
         ImGui::SetItemTooltip("How far an extra plant may move from its plant, at most (it stays on the plant's terrain triangle).");
 
         // Every change places all the grass anew: the sliders apply when let go.
-        ImGui::SeparatorText("Soft edges (a test, not saved)");
+        ImGui::SeparatorText("Soft edges (a test)");
         static grass::Settings draft = s;
         static bool editing = false;
 

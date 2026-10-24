@@ -1,0 +1,28 @@
+  <Table Name="SkyBody" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="Name" Type="string" />
+    <Field Name="Texture" Type="string" />
+    <Field Name="StockRole" Type="int" />
+    <Field Name="Size" Type="float" />
+    <Field Name="Color" Type="uint" />
+    <Field Name="Blend" Type="int" />
+    <Field Name="Order" Type="int" />
+    <Field Name="PathID" Type="int" />
+    <Field Name="PeriodDays" Type="float" />
+    <Field Name="PhaseDays" Type="float" />
+    <Field Name="VisiblePeriodDays" Type="float" />
+    <Field Name="VisibleDays" Type="float" />
+    <Field Name="VisibleOffsetDays" Type="float" />
+    <Field Name="LitMode" Type="int" />
+    <Field Name="LitPeriodDays" Type="float" />
+    <Field Name="LightColor" Type="uint" />
+    <Field Name="LightStrength" Type="float" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="Comment" Type="string" />
+    <Field Name="VisibleEase" Type="int" />
+    <Field Name="VisibleEaseSeconds" Type="float" />
+    <Field Name="Clock" Type="int" />
+    <Field Name="DayVisibility" Type="float" />
+    <Field Name="Rotation" Type="float" />
+    <Field Name="RotationPerDay" Type="float" />
+  </Table>
