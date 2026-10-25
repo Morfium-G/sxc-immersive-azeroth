@@ -8,7 +8,7 @@ namespace ia::prof {
         const char* const kNames[kStepCount] = {
             "Immersive Azeroth: world snapshot", "Immersive Azeroth: sky", "Immersive Azeroth: climate", "Immersive Azeroth: ground",
             "Immersive Azeroth: wind", "Immersive Azeroth: grass", "Immersive Azeroth: zones' weather", "Immersive Azeroth: fields",
-            "Immersive Azeroth: fog field", "Immersive Azeroth: fog hand-over", "Immersive Azeroth: covers", "Immersive Azeroth: lights",
+            "Immersive Azeroth: fog field", "Immersive Azeroth: fog hand-over", "Immersive Azeroth: fog layers built", "Immersive Azeroth: covers", "Immersive Azeroth: lights",
         };
 
         const sxc_profiler_api* Api() {

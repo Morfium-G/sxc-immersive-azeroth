@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <unordered_map>
 #include <vector>
+#include "Profiler.h"
 #include "SXC/Api/sxc_fog.h"
 #include "env/Regional.h"
 #include "env/Wind.h"
@@ -18,6 +19,7 @@ namespace ia::fog {
     namespace {
         constexpr int N = kGridSize;
         constexpr double kColourRefreshMs = 500.0; // the stock colour follows the time of day: colours again at most this often
+        constexpr double kMinBuildMs = 50.0;       // the field's layers built at most this often (20 a second)
 
         Look g_look;
         std::vector<float> g_light(N * N * 4), g_pool(N * N * 4), g_tint(N * N * 4);
@@ -25,6 +27,7 @@ namespace ia::fog {
         std::vector<uint8_t> g_cellHas(N * N);
         uint32_t g_sentVersion = ~0u;
         double g_lastColours = 0.0;
+        double g_lastBuild = 0.0;
         bool g_sentEmpty = false;
         unsigned g_uploads = 0;
         float g_player[3] = {};
@@ -108,28 +111,55 @@ namespace ia::fog {
             const uint32_t playerArea = snap.areaCount > 0 ? snap.areaChain[0] : 0;
             FogColour(-1, playerArea, snap.mapId, stock, placeColour);
 
-            // Each place's kind colours, once per place per build (area 0: the player's place).
+            // Each place's kind colours, once per place per build (area 0: the player's place). Neighbouring
+            // cells are nearly always the same place: the last one found is kept at hand.
             std::unordered_map<uint32_t, PlaceColours> places;
+            uint32_t lastArea = ~0u;
+            const PlaceColours* lastColours = nullptr;
 
             auto coloursOf = [&](uint32_t area) -> const PlaceColours& {
+                if (area == lastArea) {
+                    return *lastColours;
+                }
+
                 auto found = places.find(area);
 
-                if (found != places.end()) {
-                    return found->second;
+                if (found == places.end()) {
+                    PlaceColours pc;
+
+                    for (int k = 0; k < kKindCount; k++) {
+                        FogColour(k, area ? area : playerArea, snap.mapId, stock, pc.kind[k]);
+                    }
+
+                    found = places.emplace(area, pc).first;
                 }
 
-                PlaceColours pc;
-
-                for (int k = 0; k < kKindCount; k++) {
-                    FogColour(k, area ? area : playerArea, snap.mapId, stock, pc.kind[k]);
-                }
-
-                return places.emplace(area, pc).first->second;
+                lastArea = area;
+                lastColours = &found->second;   // unordered_map keeps its elements in place
+                return found->second;
             };
 
             // Where the light layer starts: the lowest known ground within floorReach cells, so it
-            // doesn't drape up walls.
+            // doesn't drape up walls. A square's minimum taken along the rows, then down the columns.
             const int reach = g_look.floorReach < 0 ? 0 : (g_look.floorReach > 4 ? 4 : g_look.floorReach);
+            static std::vector<float> rowLow(N * N);
+            constexpr float kNone = 1.0e30f;   // no known ground in reach
+
+            for (int r = 0; r < N; r++) {
+                for (int c = 0; c < N; c++) {
+                    float low = kNone;
+
+                    for (int dc = -reach; dc <= reach; dc++) {
+                        const int n = r * N + Wrap(c + dc);
+
+                        if (grid.groundKnown[n] && grid.ground[n] < low) {
+                            low = grid.ground[n];
+                        }
+                    }
+
+                    rowLow[r * N + c] = low;
+                }
+            }
 
             for (int r = 0; r < N; r++) {
                 for (int c = 0; c < N; c++) {
@@ -137,13 +167,7 @@ namespace ia::fog {
                     float low = grid.ground[index];
 
                     for (int dr = -reach; dr <= reach; dr++) {
-                        for (int dc = -reach; dc <= reach; dc++) {
-                            const int n = Wrap(r + dr) * N + Wrap(c + dc);
-
-                            if (grid.groundKnown[n] && grid.ground[n] < low) {
-                                low = grid.ground[n];
-                            }
-                        }
+                        low = std::fmin(low, rowLow[Wrap(r + dr) * N + c]);
                     }
 
                     g_base[index] = low;
@@ -155,20 +179,26 @@ namespace ia::fog {
                 float pool = 0.0f, poolDensity = 0.0f, poolWeight = 0.0f;
                 float mix[3] = {}, mixWeight = 0.0f;
                 const uint32_t area = grid.area[index];
-                PlaceColours colours = coloursOf(area);
+                const PlaceColours* placeColours = &coloursOf(area);
                 uint32_t otherArea = 0;
                 const float otherShare = BlendOf(index, otherArea);
+                PlaceColours blended;
 
                 // The place's colours, blended toward the other place around like its settings.
                 if (otherShare > 0.0f && otherArea != area) {
+                    blended = *placeColours;
                     const PlaceColours& other = coloursOf(otherArea);
 
                     for (int k = 0; k < kKindCount; k++) {
                         for (int ch = 0; ch < 3; ch++) {
-                            colours.kind[k][ch] += (other.kind[k][ch] - colours.kind[k][ch]) * otherShare;
+                            blended.kind[k][ch] += (other.kind[k][ch] - blended.kind[k][ch]) * otherShare;
                         }
                     }
+
+                    placeColours = &blended;
                 }
+
+                const PlaceColours& colours = *placeColours;
 
                 for (int k = 0; k < kKindCount; k++) {
                     const KindSettings ks = SettingsAt(k, index);
@@ -380,14 +410,18 @@ namespace ia::fog {
             fogNear = any;
             const double now = NowMs();
             const bool fading = StepReady(dt);
-            const bool rebuild = grid.version != g_sentVersion || now - g_lastColours > kColourRefreshMs;
+            // The field changes every frame while pools flow, a fraction of a cell at a time: rebuilt at most
+            // kMinBuildMs apart (a whole rebuild and upload every frame cost 2-3 ms).
+            const bool rebuild = (grid.version != g_sentVersion && now - g_lastBuild >= kMinBuildMs) || now - g_lastColours > kColourRefreshMs;
 
             // Rebuilt when the field changed and for the colours; sent again as it is while cells fade in.
             if (any && (rebuild || fading)) {
                 if (rebuild) {
+                    prof::Scope p(prof::kFogBuild);
                     Build(snap);
                     g_sentVersion = grid.version;
                     g_lastColours = now;
+                    g_lastBuild = now;
                 }
 
                 sxc_fog_field field = {};

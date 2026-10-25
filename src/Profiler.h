@@ -14,6 +14,7 @@ namespace ia::prof {
         kFields,
         kFogField,   // the fog's field, far map, wake
         kFogDraw,    // what the fog hands the client per frame
+        kFogBuild,   // inside it: the field's layers built
         kCover,
         kLights,
         kStepCount
