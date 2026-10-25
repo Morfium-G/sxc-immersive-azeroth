@@ -20,7 +20,8 @@
     { "service": "sxc.fog", "version": 1 },
     { "service": "sxc.cover", "version": 1 },
     { "service": "sxc.lights", "version": 1 },
-    { "service": "sxc.grass", "version": 1 }
+    { "service": "sxc.grass", "version": 1 },
+    { "service": "sxc.profiler", "version": 1 }
   ],
   "loadAfter": ["sxc.bridge"]
 }

@@ -10,6 +10,7 @@
 #include <memory>
 #include "Config.h"
 #include "Lua.h"
+#include "Profiler.h"
 #include "SXC/Api/sxc_data.hpp"
 #include "SXC/Api/sxc_ui.hpp"
 #include "Tables.h"
@@ -166,11 +167,16 @@ namespace {
             ia::sky::bodytables::SetDefaultLoreYear(cfg.loreYear.Get());
             ia::sky::clock::SetDayLengthStrength(cfg.enabled.Get() ? cfg.skyDayLength.Get() : 0.0f);
 
+            namespace prof = ia::prof;
+            prof::Enter(prof::kWorld);
             const ia::world::Snapshot& snap = ia::world::Refresh();
+            prof::Leave(prof::kWorld);
+            prof::Enter(prof::kSky);
             ia::sky::clock::Update(dt, snap);
             ia::sky::ephemeris::Tick(dt);
-            ia::climate::Update(snap);
-            ia::sky::bodies::Update(snap);
+            prof::Leave(prof::kSky);
+            { prof::Scope p(prof::kClimate); ia::climate::Update(snap); }
+            { prof::Scope p(prof::kSky); ia::sky::bodies::Update(snap); }
 
             // The environment: off with the mod, forgotten when the world is left (a new character,
             // a logout: the zones' weather memory is per session).
@@ -191,17 +197,21 @@ namespace {
             }
 
             m_envRunning = true;
+            prof::Enter(prof::kGround);
             ia::materials::Update();
             ia::covertable::Update();
-            ia::wind::Update(dt, snap);
-            ia::grass::Update(dt, snap);
-            ia::regional::Update(dt, snap);
-            ia::fields::Update(dt, snap);
+            prof::Leave(prof::kGround);
+            { prof::Scope p(prof::kWind); ia::wind::Update(dt, snap); }
+            { prof::Scope p(prof::kGrass); ia::grass::Update(dt, snap); }
+            { prof::Scope p(prof::kRegional); ia::regional::Update(dt, snap); }
+            { prof::Scope p(prof::kFields); ia::fields::Update(dt, snap); }
+            prof::Enter(prof::kFogField);
             ia::fogsettings::Update();
             ia::fog::Update(dt, snap);
-            ia::fog::Draw(dt, snap);
-            ia::cover::Update(snap);
-            ia::lights::Update(snap);
+            prof::Leave(prof::kFogField);
+            { prof::Scope p(prof::kFogDraw); ia::fog::Draw(dt, snap); }
+            { prof::Scope p(prof::kCover); ia::cover::Update(snap); }
+            { prof::Scope p(prof::kLights); ia::lights::Update(snap); }
         }
 
         struct OnUpdate {
