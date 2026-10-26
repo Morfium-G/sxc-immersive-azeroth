@@ -221,11 +221,11 @@ namespace {
 
         struct OnUpdate {
             ImmersiveAzeroth* self;
-            void operator()(const wxl_update_args& args) const { self->Update(args.delta); }
+            void operator()(float delta) const { self->Update(delta); }
         };
 
         struct OnScriptReady {
-            void operator()(const wxl_script_vm_args&) const { ia::lua::Register(); }
+            void operator()(wxl_script_context, void*) const { ia::lua::Register(); }
         };
 
         bool m_ready = false;
@@ -237,4 +237,4 @@ namespace {
     };
 }
 
-WXL_MOD(ImmersiveAzeroth, "seyri.immersive-azeroth", "Immersive Azeroth", 1)
+WXL_MOD(ImmersiveAzeroth, "seyri.immersive-azeroth", "Immersive Azeroth")

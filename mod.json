@@ -2,7 +2,7 @@
   "id": "seyri.immersive-azeroth",
   "name": "Immersive Azeroth",
   "version": "0.1.0",
-  "abi": "0.5",
+  "abi": "0.1.15",
   "description": "Makes the world feel alive: simulation and data-driven sky, climate, fog, covers, lights and wind. Needs an SXC build of the client.",
   "authors": ["Seyri"],
   "binaries": {
