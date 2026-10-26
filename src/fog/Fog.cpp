@@ -468,6 +468,9 @@ namespace ia::fog {
         look.method = g_look.froxels ? 1 : 0;
         look.max_steps = g_look.maxSteps;
         look.handover = g_look.handover;
+        look.light_strength = g_look.lights ? g_look.lightStrength : 0.0f;
+        look.light_glow = g_look.lightGlow;
+        look.light_range = g_look.lightRange;
         api->set_look(&look);
     }
 

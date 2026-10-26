@@ -29,6 +29,10 @@ namespace ia::fog {
         int debugPlaces = 0;         // debug: the fog coloured by place (0 off, 1 by zone, 2 by area), blended where places mix
         bool debugNearFar = false;   // debug: the near field green, the far fog blue, the haze grey (WXL's view 4)
         float fadeIn = 1.5f;         // s: a near cell that just started fades in over the far fog
+        bool lights = true;          // our lights (torches, braziers, lamps) light the fog around them
+        float lightStrength = 1.0f;  // x their light in the fog
+        float lightGlow = 0.3f;      // forward scattering: brighter looking toward a lamp (0: the same every way)
+        float lightRange = 96.0f;    // yd from the camera
     };
     Look& LookSettings();
 

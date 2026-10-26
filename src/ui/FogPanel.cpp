@@ -264,6 +264,20 @@ namespace ia::ui {
             FarAndWake();
         }
 
+        if (ImGui::CollapsingHeader("Lights in the fog (not saved)")) {
+            ImGui::Checkbox("our lights light the fog", &look.lights);
+            ImGui::SetItemTooltip("Torches, braziers and lamps (the Lights panel's) glow in the fog around them, through their shadow maps: "
+                                  "light falls through windows and between pillars. Indoor lights without a shadow map stay out of it.");
+
+            if (look.lights) {
+                ImGui::SliderFloat("strength", &look.lightStrength, 0.0f, 4.0f, "%.2f");
+                ImGui::SliderFloat("glow toward a lamp", &look.lightGlow, 0.0f, 0.8f, "%.2f");
+                ImGui::SetItemTooltip("Fog scatters light mostly forward: it glows brighter looking toward a lamp than away from it. 0: the same every way.");
+                ImGui::SliderFloat("range (yd)", &look.lightRange, 16.0f, 256.0f, "%.0f");
+                ImGui::SetItemTooltip("How far from you the lights light the fog (the light volume's reach; farther = coarser near you).");
+            }
+        }
+
         if (ImGui::CollapsingHeader("Look (not saved)")) {
             Look();
         }
