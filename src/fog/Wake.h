@@ -12,7 +12,7 @@
 #include "World.h"
 
 namespace ia::fog::wake {
-    // The panel's (not saved); WXL's defaults.
+    // The panel's (saved in SXC.ini by Saved.cpp); WXL's defaults.
     struct Settings {
         bool enabled = true;
         float strength = 0.9f;     // how much fog a moving unit pushes out at its body (0..1)

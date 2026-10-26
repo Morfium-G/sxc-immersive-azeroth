@@ -11,6 +11,7 @@
 #include "Config.h"
 #include "Lua.h"
 #include "Profiler.h"
+#include "Saved.h"
 #include "SXC/Api/sxc_data.hpp"
 #include "SXC/Api/sxc_ui.hpp"
 #include "Tables.h"
@@ -162,6 +163,7 @@ namespace {
                 return;
             }
 
+            ia::saved::SyncAll();   // the panels' settings to and from SXC.ini
             const ia::Config& cfg = *ia::Cfg();
             ia::sky::bodies::SetEnabled(cfg.enabled.Get() && cfg.skyBodies.Get());
             ia::sky::bodytables::SetDefaultLoreYear(cfg.loreYear.Get());

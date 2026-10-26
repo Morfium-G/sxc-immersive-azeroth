@@ -8,7 +8,7 @@
 #include "World.h"
 
 namespace ia::lights {
-    // The settings (the panel; not saved). WXL's defaults.
+    // The settings (the panel; saved in SXC.ini by Saved.cpp, but the debug view). WXL's defaults.
     struct Settings {
         bool enabled = true;
         bool stockOff = true;        // the client's own 3 per terrain chunk off while ours are on

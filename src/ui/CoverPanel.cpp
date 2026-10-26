@@ -84,7 +84,7 @@ namespace ia::ui {
         ImGui::TextDisabled("SurfaceCover: %s", covertable::Status());
         ImGui::TextDisabled("chunks resolved since the tables changed: %u", cover::Resolved());
 
-        ImGui::SeparatorText("Look (not saved)");
+        ImGui::SeparatorText("Look (the debug view and the x multipliers: not saved)");
         ImGui::Checkbox("Covers", &look.enabled);
         ImGui::SameLine();
         ImGui::Checkbox("Fallen snow", &look.fallenSnow);

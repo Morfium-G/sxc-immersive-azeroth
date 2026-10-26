@@ -7,7 +7,7 @@
 #include "World.h"
 
 namespace ia::fog {
-    // The look (the panel; not saved).
+    // The look (the panel; saved in SXC.ini by Saved.cpp, but the debug views and the extra haze).
     struct Look {
         bool enabled = true;
         bool debug = false;          // magenta

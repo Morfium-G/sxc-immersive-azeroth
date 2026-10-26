@@ -36,7 +36,7 @@ namespace ia::ui {
 
         ImGui::TextDisabled("Now: terrain, models and WMOs per pixel, with shadows. Next: the light editor.");
 
-        ImGui::SeparatorText("Settings (not saved)");
+        ImGui::SeparatorText("Settings (the debug view: not saved)");
         ImGui::Checkbox("Our lights", &s.enabled);
         ImGui::SameLine();
         ImGui::Checkbox("Stock terrain lights off", &s.stockOff);

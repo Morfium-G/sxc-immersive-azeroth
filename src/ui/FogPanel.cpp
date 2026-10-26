@@ -260,11 +260,11 @@ namespace ia::ui {
             Zones();
         }
 
-        if (ImGui::CollapsingHeader("Far fog and the wake (not saved)")) {
+        if (ImGui::CollapsingHeader("Far fog and the wake")) {
             FarAndWake();
         }
 
-        if (ImGui::CollapsingHeader("Lights in the fog (not saved)")) {
+        if (ImGui::CollapsingHeader("Lights in the fog")) {
             ImGui::Checkbox("our lights light the fog", &look.lights);
             ImGui::SetItemTooltip("Torches, braziers and lamps (the Lights panel's) glow in the fog around them, through their shadow maps: "
                                   "light falls through windows and between pillars. Indoor lights without a shadow map stay out of it.");
@@ -278,7 +278,7 @@ namespace ia::ui {
             }
         }
 
-        if (ImGui::CollapsingHeader("Look (not saved)")) {
+        if (ImGui::CollapsingHeader("Look (the extra haze: not saved)")) {
             Look();
         }
 

@@ -12,7 +12,7 @@
 #include "env/CoverTable.h"
 
 namespace ia::cover {
-    // The look (the panel; not saved).
+    // The look (the panel; saved in SXC.ini by Saved.cpp, but the debug view and the testing multipliers).
     struct Look {
         bool enabled = true;
         bool fallenSnow = true;

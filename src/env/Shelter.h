@@ -24,7 +24,7 @@ namespace ia::shelter {
     // and 45 degree wind sector, angled slightly upward so ordinary slopes don't count.
     float Lee(const float pos[3], float windDirX, float windDirY);
 
-    // The lee's shape (the wind panel; not saved).
+    // The lee's shape (the wind panel; saved in SXC.ini by Saved.cpp).
     struct LeeParams {
         float reach = 15.0f;    // yards upwind an obstacle still casts shadow
         float angleDeg = 15.0f; // ray rise; only obstacles steeper than this block
