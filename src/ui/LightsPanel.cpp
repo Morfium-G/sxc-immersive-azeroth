@@ -52,9 +52,10 @@ namespace ia::ui {
                               "walls between rooms, floors, roofs. Drawn once, redrawn when the light moves or a WMO near it finishes\n"
                               "loading. Units cast none (yet). Glass and other see-through WMO faces let the light through.");
         ImGui::SameLine();
-        ImGui::Checkbox("Doodads cast", &s.shadowDoodads);
-        ImGui::SetItemTooltip("The placed doodads (furniture, barrels, fences, trees) cast too; leaves and fences by their texture's\n"
-                              "see-through parts. Glows, flames and glass cast nothing; nor does the model a light hangs on.");
+        ImGui::Checkbox("Doodads and objects cast", &s.shadowDoodads);
+        ImGui::SetItemTooltip("The placed doodads (furniture, barrels, fences, trees) and the server's game objects (chairs, braziers,\n"
+                              "mailboxes; not doors or transports) cast too; leaves and fences by their texture's see-through parts.\n"
+                              "Glows, flames and glass cast nothing; nor does the model a light hangs on.");
         ImGui::SetNextItemWidth(200.0f);
         ImGui::SliderInt("Lights with shadows", &s.shadowCount, 0, 64);
         ImGui::SetItemTooltip("The nearest this many (up to the maps the device holds).");
