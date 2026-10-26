@@ -246,9 +246,9 @@ are per pixel on the terrain, the covers, models, WMOs and the grass (Vulkan), a
 own lighting; inside and outside are told apart (a WMO's indoor groups only take indoor lights), and
 the nearest lights (64 by default) cast **shadows** from WMOs, the terrain and placed doodads (cube
 shadow maps, redrawn only when the light or what's around it changes). The **Lights panel** sets the
-counts, ranges and shadows; the **Light editor** panel edits both tables live: the models near you
-with their attachment points, emitters, bones and own lights, markers in the world, "add a light to
-this model", save and reload.
+counts, ranges and shadows; the **Light editor** panel edits the tables live (the lights, the emitters
+below and where both go): the models near you with their attachment points, particle emitters, bones
+and own lights, markers in the world, "add a light / an emitter to this model", save and reload.
 
 ### DoodadLightProperties.cdbc
 
@@ -269,9 +269,34 @@ What a light is. A value of **−1 takes the default** (the Lights panel's setti
 | FlickerAmount | 0..1, how much the light dips |
 | Flags | reserved, 0 |
 
-### DoodadLightAssignment.cdbc
+### DoodadEmitterProperties.cdbc
 
-Where lights go. Several rows per model are fine (a brazier with two flames).
+What an emitter does to the world around it. Emitters feed the world fields and the wind, so what
+follows from them follows by itself: warm air melts snow, dries the ground and burns off fog; a drip
+wets the ground under it; a draft bends the grass and pushes the fog.
+
+| Field | Meaning |
+|---|---|
+| ID | emitter id (what assignments refer to) |
+| Name | for the editor |
+| Type | 0 = temperature, 1 = moisture, 2 = draft |
+| Strength | temperature: the air's **°C right at the source** (a brazier ~40, a forge ~60, an ice block −15; from 30 it melts the snow around it); moisture: how wet the ground gets at the source, 0..1; draft: the wind's strength at the source (1 = a strong wind) |
+| Radius | yards (× the model's scale); nothing beyond. −1 = 8 |
+| Falloff | shape: 1 = smooth (default), higher = tighter around the source |
+| Spread | degrees from the row's Direction the emitter reaches: a cone (a drip: narrow, pointing down; a stove's heat out of its door); 180 = every way (a draft then blows outward). −1 = 180, drafts 30 |
+| Flags | reserved, 0 |
+
+The strongest temperature source at a spot wins (a hot liquid, hot ground or an emitter: they don't
+add up); moisture emitters add like water nearby (by the ground's absorbency); drafts add to the wind
+where they are, under a roof or in a lee too. Reach is measured in 3D: a brazier on a tower doesn't
+warm the street below.
+
+### DoodadSourceAssignment.cdbc
+
+Where lights and emitters go: **a light, an emitter or both per row** (a brazier: its flame's light and
+its heat in one row; a ceiling drip: an emitter alone). Several rows per model are fine (a brazier with
+two flames). Formerly DoodadLightAssignment.cdbc: while no DoodadSourceAssignment.cdbc exists the old
+file is read, and the first save writes the new one (the old file is left as it is).
 
 | Field | Meaning |
 |---|---|
@@ -281,15 +306,17 @@ Where lights go. Several rows per model are fine (a brazier with two flames).
 | AttachIndex | the attachment point ID / bone index / emitter index |
 | AttachName | **reserved** for named attachment points, empty |
 | OffsetX/Y/Z | yards from the attachment, in the model's space (scaled with the doodad) |
-| DirectionX/Y/Z | spot lights: where the cone points, in the model's space (0, 0, −1 = down) |
+| DirectionX/Y/Z | spot lights: where the cone points; drafts: where they blow. In the model's space (0, 0, −1 = down) |
 | LightID | a DoodadLightProperties ID; **0 = no light** (with the flag below: only suppress) |
 | Flags | 0x1 **suppress the model's own light entries** |
+| EmitterID | a DoodadEmitterProperties ID; **0 = no emitter** |
 
 Every model in the client's world scene counts: map doodads, WMO doodad sets, game objects (campfires,
-portals) and creatures (a fire elemental's model path gets its light too). A light follows its
-attachment while the model animates (a swinging lantern swings its light). The **radius scales with
+portals) and creatures (a fire elemental's model path gets its light too). A light or emitter follows
+its attachment while the model animates (a swinging lantern swings its light). The **radius scales with
 the model's scale** (a scaled-up fire reaches further). An attachment the model doesn't have puts the
-light at the origin + offset; the Light editor marks such rows red.
+light at the origin + offset; the Light editor marks such rows red. Emitters work on any renderer and
+with our lights off.
 
 ## AreaClimate.cdbc
 

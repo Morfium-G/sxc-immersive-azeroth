@@ -14,19 +14,14 @@
     <Field Name="Comment" Type="string" />
     <Field Name="DayLength" Type="float" />
   </Table>
-  <Table Name="DoodadLightAssignment" Build="12340">
+  <Table Name="DoodadEmitterProperties" Build="12340">
     <Field Name="ID" Type="int" IsIndex="true" />
-    <Field Name="ModelPath" Type="string" />
-    <Field Name="AttachType" Type="int" />
-    <Field Name="AttachIndex" Type="int" />
-    <Field Name="AttachName" Type="string" />
-    <Field Name="OffsetX" Type="float" />
-    <Field Name="OffsetY" Type="float" />
-    <Field Name="OffsetZ" Type="float" />
-    <Field Name="DirectionX" Type="float" />
-    <Field Name="DirectionY" Type="float" />
-    <Field Name="DirectionZ" Type="float" />
-    <Field Name="LightID" Type="int" />
+    <Field Name="Name" Type="string" />
+    <Field Name="Type" Type="int" />
+    <Field Name="Strength" Type="float" />
+    <Field Name="Radius" Type="float" />
+    <Field Name="Falloff" Type="float" />
+    <Field Name="Spread" Type="float" />
     <Field Name="Flags" Type="int" />
   </Table>
   <Table Name="DoodadLightProperties" Build="12340">
@@ -43,6 +38,22 @@
     <Field Name="FlickerSpeed" Type="float" />
     <Field Name="FlickerAmount" Type="float" />
     <Field Name="Flags" Type="int" />
+  </Table>
+  <Table Name="DoodadSourceAssignment" Build="12340">
+    <Field Name="ID" Type="int" IsIndex="true" />
+    <Field Name="ModelPath" Type="string" />
+    <Field Name="AttachType" Type="int" />
+    <Field Name="AttachIndex" Type="int" />
+    <Field Name="AttachName" Type="string" />
+    <Field Name="OffsetX" Type="float" />
+    <Field Name="OffsetY" Type="float" />
+    <Field Name="OffsetZ" Type="float" />
+    <Field Name="DirectionX" Type="float" />
+    <Field Name="DirectionY" Type="float" />
+    <Field Name="DirectionZ" Type="float" />
+    <Field Name="LightID" Type="int" />
+    <Field Name="Flags" Type="int" />
+    <Field Name="EmitterID" Type="int" />
   </Table>
   <Table Name="FogSettings" Build="12340">
     <Field Name="ID" Type="int" IsIndex="true" />

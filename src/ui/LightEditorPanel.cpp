@@ -1,9 +1,11 @@
 // The light editor (port plan 6c; WXL's debug/LightEditor): the models near the player with their
-// attachment points, particle emitters, own lights and bones; their DoodadLightAssignment rows and every
-// DoodadLightProperties row, edited live through the Data view's own forms (its undo, revert and row
-// windows), saved back to the files or reloaded. Markers in the world while the panel is open: the
-// lights as drawn (a cross in their colour, rings at their radius), the selected model's points, and a
-// red mark where a row's attachment is missing (the light sits at the model's origin).
+// attachment points, particle emitters, own lights and bones; their DoodadSourceAssignment rows (a light,
+// an emitter or both) and every DoodadLightProperties and DoodadEmitterProperties row, edited live through
+// the Data view's own forms (its undo, revert and row windows), saved back to the files or reloaded.
+// Markers in the world while the panel is open: the lights as drawn (a cross in their colour, rings at
+// their radius), the emitters (a diamond: warm red, cold blue, moisture cyan, a draft green with its
+// arrow), the selected model's points, and a red mark where a row's attachment is missing (the light
+// sits at the model's origin).
 #include "ui/Panels.h"
 
 #include <algorithm>
@@ -20,6 +22,7 @@
 #include "SXC/Api/sxc_data.hpp"
 #include "SXC/Api/sxc_lights.h"
 #include "World.h"
+#include "env/Emitters.h"
 #include "imgui.h"
 #include "lights/Lights.h"
 
@@ -35,6 +38,7 @@ namespace ia::ui {
         const char* const kCategories[5] = { "item", "creature", "character", "world", "other" };
         std::string g_selected;          // normalised path
         int g_markers = 1;               // 0 off, 1 the selected model's lights, 2 every light within the range
+        int g_emitterMarkers = 1;        // the same for the emitters
         bool g_rings = true;
         bool g_points = true;            // the selected model's attachment points, emitters, own lights
         bool g_bones = false;            // ... and its bones
@@ -124,7 +128,8 @@ namespace ia::ui {
         // --- the tables ----------------------------------------------------------------------------
         struct Tables {
             sxc::data::Table lights = sxc::data::Table::Get("DoodadLightProperties");
-            sxc::data::Table rows = sxc::data::Table::Get("DoodadLightAssignment");
+            sxc::data::Table emitters = sxc::data::Table::Get("DoodadEmitterProperties");
+            sxc::data::Table rows = sxc::data::Table::Get("DoodadSourceAssignment");
         };
 
         Tables& T() {
@@ -134,12 +139,18 @@ namespace ia::ui {
                 t.lights = sxc::data::Table::Get("DoodadLightProperties");
             }
 
+            if (!t.emitters) {
+                t.emitters = sxc::data::Table::Get("DoodadEmitterProperties");
+            }
+
             if (!t.rows) {
-                t.rows = sxc::data::Table::Get("DoodadLightAssignment");
+                t.rows = sxc::data::Table::Get("DoodadSourceAssignment");
             }
 
             return t;
         }
+
+        const char* const kEmitterTypes[3] = { "temperature", "moisture", "draft" };
 
         // The assignment rows of a model (ids), from an index rebuilt when the table changes.
         std::vector<uint32_t> RowsOf(const std::string& key) {
@@ -169,6 +180,15 @@ namespace ia::ui {
 
             const sxc::data::Row r = T().lights.Find(id);
             return r ? std::to_string(id) + " " + std::string(r.String(T().lights.Field("Name"))) : std::to_string(id) + " (missing)";
+        }
+
+        std::string EmitterName(uint32_t id) {
+            if (!id) {
+                return "no emitter";
+            }
+
+            const sxc::data::Row r = T().emitters ? T().emitters.Find(id) : sxc::data::Row();
+            return r ? std::to_string(id) + " " + std::string(r.String(T().emitters.Field("Name"))) : std::to_string(id) + " (missing)";
         }
 
         // One table's line: its state, undo / redo, save, reload.
@@ -250,9 +270,101 @@ namespace ia::ui {
             return out;
         }
 
+        // A row's Direction (where a spot light or an emitter's cone points; where a draft blows): a vector in
+        // the model's space, shown as yaw (around the model's up axis) and pitch in degrees, with Down, Up and
+        // "At me" (from the row's point on the model nearest you to your feet, turned into the model's space:
+        // every placed copy then points the same way relative to itself).
+        void DirectionControls(const Model& m, const sxc::data::Row& r, uint32_t type, int32_t index, const std::vector<sxc_lights_point>& points) {
+            const sxc::data::Table& t = T().rows;
+            const int fDir = t.Field("Direction");
+            float d[3] = { r.Float(fDir, 0), r.Float(fDir, 1), r.Float(fDir, 2) };
+            float len = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+
+            if (len < 1e-6f) {
+                d[0] = 0.0f;
+                d[1] = 0.0f;
+                d[2] = -1.0f;
+                len = 1.0f;
+            }
+
+            constexpr float kDeg = 57.2957795f;
+            float yaw = std::atan2(d[1], d[0]) * kDeg;
+            float pitch = std::asin(std::fmax(-1.0f, std::fmin(1.0f, d[2] / len))) * kDeg;
+            auto write = [&](float x, float y, float z) {
+                r.SetFloat(fDir, 0, x);
+                r.SetFloat(fDir, 1, y);
+                r.SetFloat(fDir, 2, z);
+            };
+
+            ImGui::SetNextItemWidth(105.0f);
+            bool changed = ImGui::DragFloat("##yaw", &yaw, 1.0f, -180.0f, 180.0f, "yaw %.0f deg");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(105.0f);
+            changed |= ImGui::DragFloat("##pitch", &pitch, 1.0f, -90.0f, 90.0f, "pitch %.0f deg");
+
+            if (changed) {
+                const float cp = std::cos(pitch / kDeg);
+                write(cp * std::cos(yaw / kDeg), cp * std::sin(yaw / kDeg), std::sin(pitch / kDeg));
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::SmallButton("Down")) {
+                write(0.0f, 0.0f, -1.0f);
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::SmallButton("Up")) {
+                write(0.0f, 0.0f, 1.0f);
+            }
+
+            ImGui::SameLine();
+            const sxc_lights_api* lightsApi = lights::EditorApi();
+            const bool canAim = lightsApi && lightsApi->struct_size >= offsetof(sxc_lights_api, model_axes) + sizeof(lightsApi->model_axes);
+            ImGui::BeginDisabled(!canAim);
+
+            if (ImGui::SmallButton("At me")) {
+                const world::Snapshot& s = world::Current();
+                float axes[9];
+                // Where the row hangs on the copy nearest you (its origin for "origin" or a point it lacks).
+                const float* from = m.pos;
+
+                for (const sxc_lights_point& p : points) {
+                    if (type != SXC_LIGHTS_ATTACH_ORIGIN && p.kind == type && p.index == index) {
+                        from = p.pos;
+                    }
+                }
+
+                const float w[3] = { s.playerPos[0] - from[0], s.playerPos[1] - from[1], s.playerPos[2] - from[2] };
+
+                if (lightsApi->model_axes(m.path.c_str(), s.playerPos, axes)) {
+                    float local[3];
+
+                    for (int k = 0; k < 3; k++) {
+                        local[k] = w[0] * axes[k * 3] + w[1] * axes[k * 3 + 1] + w[2] * axes[k * 3 + 2];
+                    }
+
+                    const float l = std::sqrt(local[0] * local[0] + local[1] * local[1] + local[2] * local[2]);
+
+                    if (l > 1e-4f) {
+                        write(local[0] / l, local[1] / l, local[2] / l);
+                    }
+                } else {
+                    std::snprintf(g_message, sizeof g_message, "At me: this model hangs on another one (no rotation of its own to aim with)");
+                }
+            }
+
+            ImGui::EndDisabled();
+            ImGui::SetItemTooltip("Points it from the row's point on the copy nearest you to your feet.");
+            ImGui::SameLine();
+            ImGui::TextDisabled("Direction");
+        }
+
         void EditRows(const sxc_data_api* api, const Model& m, const std::vector<sxc_lights_point>& points, const std::unordered_set<uint32_t>& missing) {
             sxc::data::Table& t = T().rows;
-            const int fType = t.Field("AttachType"), fIndex = t.Field("AttachIndex"), fLight = t.Field("LightID"), fFlags = t.Field("Flags");
+            const int fType = t.Field("AttachType"), fIndex = t.Field("AttachIndex"), fLight = t.Field("LightID"), fFlags = t.Field("Flags"),
+                      fEmitter = t.Field("EmitterID");
 
             for (uint32_t id : RowsOf(m.key)) {
                 const sxc::data::Row r = t.Find(id);
@@ -264,9 +376,14 @@ namespace ia::ui {
                 ImGui::PushID(static_cast<int>(id));
                 const uint32_t type = r.Uint(fType);
                 const bool lacks = missing.count(id) != 0;
-                char header[200];
-                std::snprintf(header, sizeof header, "Row %u: %s at %s %d%s%s###row", id, LightName(r.Uint(fLight)).c_str(), type < 4 ? kAttachTypes[type] : "?",
-                              r.Int(fIndex), (r.Uint(fFlags) & SXC_LIGHTS_SUPPRESS_MODEL_LIGHTS) ? ", own lights off" : "", lacks ? "  (MISSING: at the origin)" : "");
+                const uint32_t lightId = r.Uint(fLight), emitterId = fEmitter >= 0 ? r.Uint(fEmitter) : 0;
+                // What the row places: its light, its emitter, or both.
+                const std::string what = lightId && emitterId ? LightName(lightId) + " + " + EmitterName(emitterId)
+                                         : emitterId           ? EmitterName(emitterId)
+                                                               : LightName(lightId);
+                char header[260];
+                std::snprintf(header, sizeof header, "Row %u: %s at %s %d%s%s###row", id, what.c_str(), type < 4 ? kAttachTypes[type] : "?", r.Int(fIndex),
+                              (r.Uint(fFlags) & SXC_LIGHTS_SUPPRESS_MODEL_LIGHTS) ? ", own lights off" : "", lacks ? "  (MISSING: at the origin)" : "");
 
                 if (lacks) {
                     ImGui::PushStyleColor(ImGuiCol_Text, kMissing);
@@ -344,6 +461,32 @@ namespace ia::ui {
                     ImGui::EndCombo();
                 }
 
+                if (fEmitter >= 0) {
+                    ImGui::SetNextItemWidth(220.0f);
+
+                    if (ImGui::BeginCombo("Emitter", EmitterName(emitterId).c_str())) {
+                        if (ImGui::Selectable("no emitter", emitterId == 0)) {
+                            r.SetRaw(fEmitter, 0, 0);
+                        }
+
+                        const sxc::data::Table& et = T().emitters;
+
+                        for (uint32_t i = 0; et && i < et.RowCount(); i++) {
+                            const uint32_t eid = et.At(i).Id();
+
+                            if (ImGui::Selectable(EmitterName(eid).c_str(), eid == emitterId)) {
+                                r.SetRaw(fEmitter, 0, eid);
+                            }
+                        }
+
+                        ImGui::EndCombo();
+                    }
+
+                    ImGui::SetItemTooltip("Heat or cold, moisture or a draft placed with the row (DoodadEmitterProperties); a draft blows along the row's Direction.");
+                }
+
+                DirectionControls(m, r, type, r.Int(fIndex), points);
+
                 if (ImGui::SmallButton("Open in the Data view")) {
                     api->open_row(t.Handle(), id);
                 }
@@ -370,27 +513,42 @@ namespace ia::ui {
                 ImGui::PopID();
             }
 
-            if (ImGui::Button("Add a light to this model")) {
+            // A new row on this model: a light or an emitter (the other one can be added to the same row).
+            auto addRow = [&](bool light) {
                 const int32_t index = api->add_row(t.Handle());
 
-                if (index >= 0) {
-                    const sxc::data::Row r = t.At(static_cast<uint32_t>(index));
-                    r.SetString(t.Field("ModelPath"), 0, m.path.c_str());
-
-                    // A useful start: the first particle emitter (a flame), else the first attachment point, else the origin.
-                    const std::vector<Choice> emitters = ChoicesFor(SXC_LIGHTS_ATTACH_EMITTER, points, m.bones);
-                    const std::vector<Choice> attachments = ChoicesFor(SXC_LIGHTS_ATTACH_POINT, points, m.bones);
-                    const uint32_t type = !emitters.empty() ? SXC_LIGHTS_ATTACH_EMITTER : (!attachments.empty() ? SXC_LIGHTS_ATTACH_POINT : SXC_LIGHTS_ATTACH_ORIGIN);
-                    r.SetRaw(fType, 0, type);
-                    r.SetRaw(fIndex, 0, static_cast<uint32_t>(!emitters.empty() ? emitters.front().index : (!attachments.empty() ? attachments.front().index : 0)));
-                    r.SetFloat(t.Field("Direction"), 2, -1.0f);
-
-                    if (T().lights.RowCount()) {
-                        r.SetRaw(fLight, 0, T().lights.At(0).Id());
-                    }
-
-                    g_focusRow = r.Id();
+                if (index < 0) {
+                    return;
                 }
+
+                const sxc::data::Row r = t.At(static_cast<uint32_t>(index));
+                r.SetString(t.Field("ModelPath"), 0, m.path.c_str());
+
+                // A useful start: the first particle emitter (a flame), else the first attachment point, else the origin.
+                const std::vector<Choice> emitters = ChoicesFor(SXC_LIGHTS_ATTACH_EMITTER, points, m.bones);
+                const std::vector<Choice> attachments = ChoicesFor(SXC_LIGHTS_ATTACH_POINT, points, m.bones);
+                const uint32_t type = !emitters.empty() ? SXC_LIGHTS_ATTACH_EMITTER : (!attachments.empty() ? SXC_LIGHTS_ATTACH_POINT : SXC_LIGHTS_ATTACH_ORIGIN);
+                r.SetRaw(fType, 0, type);
+                r.SetRaw(fIndex, 0, static_cast<uint32_t>(!emitters.empty() ? emitters.front().index : (!attachments.empty() ? attachments.front().index : 0)));
+                r.SetFloat(t.Field("Direction"), 2, -1.0f);
+
+                if (light && T().lights.RowCount()) {
+                    r.SetRaw(fLight, 0, T().lights.At(0).Id());
+                } else if (!light && fEmitter >= 0 && T().emitters && T().emitters.RowCount()) {
+                    r.SetRaw(fEmitter, 0, T().emitters.At(0).Id());
+                }
+
+                g_focusRow = r.Id();
+            };
+
+            if (ImGui::Button("Add a light to this model")) {
+                addRow(true);
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Add an emitter to this model")) {
+                addRow(false);
             }
         }
 
@@ -456,6 +614,88 @@ namespace ia::ui {
                     r.SetRaw(fColor, 0, 0xFF9F49);   // the stock torches' colour
                 }
             }
+        }
+
+        // An emitter's marker colour: warm red, cold blue, moisture cyan, a draft green.
+        ImVec4 EmitterColour(int type, float strength) {
+            return type == 0 ? (strength >= 15.0f ? ImVec4(1.0f, 0.35f, 0.2f, 1.0f) : ImVec4(0.35f, 0.6f, 1.0f, 1.0f))
+                 : type == 1 ? ImVec4(0.3f, 0.95f, 1.0f, 1.0f)
+                             : ImVec4(0.45f, 1.0f, 0.4f, 1.0f);
+        }
+
+        // --- DoodadEmitterProperties ---------------------------------------------------------------
+        void EditEmitters(const sxc_data_api* api) {
+            sxc::data::Table& t = T().emitters;
+
+            if (!t) {
+                ImGui::TextDisabled("DoodadEmitterProperties isn't registered.");
+                return;
+            }
+
+            const int fName = t.Field("Name"), fType = t.Field("Type"), fStrength = t.Field("Strength"), fRadius = t.Field("Radius");
+            static char filter[64] = "";
+            ImGui::SetNextItemWidth(220.0f);
+            ImGui::InputTextWithHint("##emitterfilter", "filter by name or id", filter, sizeof filter);
+            const std::string wanted = Normalize(filter);
+
+            for (uint32_t i = 0; i < t.RowCount(); i++) {
+                const sxc::data::Row r = t.At(i);
+                const uint32_t id = r.Id();
+                const std::string name(r.String(fName));
+
+                if (!wanted.empty() && Normalize((std::to_string(id) + " " + name).c_str()).find(wanted) == std::string::npos) {
+                    continue;
+                }
+
+                ImGui::PushID(static_cast<int>(id));
+                const int type = r.Int(fType);
+                const float strength = r.Float(fStrength), radius = r.Float(fRadius);
+                ImGui::ColorButton("##swatch", EmitterColour(type, strength), ImGuiColorEditFlags_NoTooltip, ImVec2(14.0f, 14.0f));
+                ImGui::SameLine();
+                char amount[32];
+                std::snprintf(amount, sizeof amount, type == 0 ? "%.0f degC" : "%.2f", strength);
+                char header[200];
+                std::snprintf(header, sizeof header, "%u %s (%s %s, %s)###emitter", id, name.c_str(), type >= 0 && type < 3 ? kEmitterTypes[type] : "?", amount,
+                              radius > 0.0f ? (std::to_string(static_cast<int>(radius + 0.5f)) + " yd").c_str() : "default radius");
+
+                if (ImGui::CollapsingHeader(header)) {
+                    if (ImGui::SmallButton("Open in the Data view")) {
+                        api->open_row(t.Handle(), id);
+                    }
+
+                    ImGui::SameLine();
+
+                    if (ImGui::SmallButton("Clone")) {
+                        api->clone_row(t.Handle(), i);
+                    }
+
+                    ImGui::SameLine();
+
+                    if (ImGui::SmallButton("Delete")) {
+                        api->remove_row(t.Handle(), i);
+                        ImGui::PopID();
+                        break;
+                    }
+
+                    api->draw_row_form(t.Handle(), i);
+                }
+
+                ImGui::PopID();
+            }
+
+            if (ImGui::Button("Add an emitter")) {
+                const int32_t index = api->add_row(t.Handle());
+
+                if (index >= 0) {
+                    const sxc::data::Row r = t.At(static_cast<uint32_t>(index));
+                    r.SetString(fName, 0, "new heat");
+                    r.SetFloat(fStrength, 0, 40.0f);   // a brazier's warmth
+                }
+            }
+
+            const emitters::Stats st = emitters::GetStats();
+            ImGui::TextDisabled("%s; placed now: %u (temperature %u, moisture %u, drafts %u)%s", emitters::TableStatus(), st.placed, st.temperature, st.moisture,
+                                st.draft, st.unknown ? "; some rows name an emitter that doesn't exist" : "");
         }
 
         // --- markers in the world ------------------------------------------------------------------
@@ -566,6 +806,43 @@ namespace ia::ui {
                 }
             }
 
+            // The emitters where they are: a diamond in their colour (warm red, cold blue, moisture cyan, a draft
+            // green with an arrow along its direction), rings at their radius.
+            if (g_emitterMarkers) {
+                const std::vector<uint32_t> selectedRows = selected ? RowsOf(selected->key) : std::vector<uint32_t>();
+
+                for (const emitters::Emitter& e : emitters::All()) {
+                    if (g_emitterMarkers == 1 && std::find(selectedRows.begin(), selectedRows.end(), e.row) == selectedRows.end()) {
+                        continue;
+                    }
+
+                    const float dx = e.pos[0] - s.playerPos[0], dy = e.pos[1] - s.playerPos[1], dz = e.pos[2] - s.playerPos[2];
+
+                    if (dx * dx + dy * dy + dz * dz > g_range * g_range) {
+                        continue;
+                    }
+
+                    const ImVec4 v = EmitterColour(e.type, e.strength);
+                    const ImU32 c = ImGui::ColorConvertFloat4ToU32(v);
+                    ImVec2 at;
+
+                    if (paint.At(e.pos, at)) {
+                        paint.draw->AddQuad(ImVec2(at.x, at.y - 6.0f), ImVec2(at.x + 6.0f, at.y), ImVec2(at.x, at.y + 6.0f), ImVec2(at.x - 6.0f, at.y), c, 2.0f);
+                    }
+
+                    if (g_rings) {
+                        paint.Rings(e.pos, e.radius, ImGui::ColorConvertFloat4ToU32(ImVec4(v.x, v.y, v.z, 0.45f)));
+                    }
+
+                    if (e.type == emitters::kDraft || e.cosSpread > -0.999f) {   // a draft, or a cone: where it points
+                        const float len = std::fmax(e.radius * 0.5f, 1.0f);
+                        const float tip[3] = { e.pos[0] + e.dir[0] * len, e.pos[1] + e.dir[1] * len, e.pos[2] + e.dir[2] * len };
+                        paint.Line(e.pos, tip, c, 2.5f);
+                        paint.Cross(tip, 0.25f, c);
+                    }
+                }
+            }
+
             if (!selected) {
                 return;
             }
@@ -626,7 +903,12 @@ namespace ia::ui {
         }
 
         TableLine(dataApi, "DoodadLightProperties", T().lights);
-        TableLine(dataApi, "DoodadLightAssignment", T().rows);
+
+        if (T().emitters) {
+            TableLine(dataApi, "DoodadEmitterProperties", T().emitters);
+        }
+
+        TableLine(dataApi, "DoodadSourceAssignment", T().rows);
 
         if (g_message[0]) {
             ImGui::TextDisabled("%s", g_message);
@@ -653,7 +935,10 @@ namespace ia::ui {
         ImGui::SetItemTooltip("A cross in the light's colour where it is drawn; a square: indoor; a white dot: it has a shadow map.");
         ImGui::SameLine();
         ImGui::Checkbox("Reach", &g_rings);
-        ImGui::SetItemTooltip("Rings at the light's radius (where it reaches 0).");
+        ImGui::SetItemTooltip("Rings at the light's or emitter's radius (where it reaches 0).");
+        ImGui::SetNextItemWidth(220.0f);
+        ImGui::Combo("Emitters", &g_emitterMarkers, "off\0the selected model's\0all within the range\0");
+        ImGui::SetItemTooltip("A diamond where each emitter is: warm red, cold blue, moisture cyan, a draft green (its arrow: where it blows).");
         ImGui::Checkbox("The selected model's points", &g_points);
         ImGui::SetItemTooltip("A yellow: attachment points (by ID), E orange: particle emitters, L cyan: its own lights,\n"
                               "B grey: bones. The open row's attachment is white.");
@@ -671,7 +956,7 @@ namespace ia::ui {
             ImGui::Checkbox(kCategories[c], &g_category[c]);
         }
 
-        ImGui::TextColored(kOurs, "green: has our light");
+        ImGui::TextColored(kOurs, "green: has our light or emitter");
         ImGui::SameLine();
         ImGui::TextColored(kStock, " amber: only its own");
         ImGui::SameLine();
@@ -692,9 +977,11 @@ namespace ia::ui {
                 shown++;
                 bool ours = false, lacks = false;
 
+                const int fEmitter = T().rows.Field("EmitterID");
+
                 for (uint32_t id : RowsOf(m.key)) {
                     const sxc::data::Row r = T().rows.Find(id);
-                    ours = ours || (r && r.Uint(T().rows.Field("LightID")) != 0);
+                    ours = ours || (r && (r.Uint(T().rows.Field("LightID")) != 0 || (fEmitter >= 0 && r.Uint(fEmitter) != 0)));
                     lacks = lacks || missing.count(id) != 0;
                 }
 
@@ -750,7 +1037,7 @@ namespace ia::ui {
         ImGui::SeparatorText("The selected model");
 
         if (!selected) {
-            ImGui::TextDisabled("Select a model above to put lights on it.");
+            ImGui::TextDisabled("Select a model above to put lights or emitters on it.");
         } else {
             ImGui::TextWrapped("%s", selected->path.c_str());
 
@@ -764,5 +1051,8 @@ namespace ia::ui {
 
         ImGui::SeparatorText("Lights (DoodadLightProperties)");
         EditLights(dataApi);
+
+        ImGui::SeparatorText("Emitters (DoodadEmitterProperties)");
+        EditEmitters(dataApi);
     }
 }

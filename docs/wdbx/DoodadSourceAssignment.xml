@@ -1,4 +1,4 @@
-  <Table Name="DoodadLightAssignment" Build="12340">
+  <Table Name="DoodadSourceAssignment" Build="12340">
     <Field Name="ID" Type="int" IsIndex="true" />
     <Field Name="ModelPath" Type="string" />
     <Field Name="AttachType" Type="int" />
@@ -12,4 +12,5 @@
     <Field Name="DirectionZ" Type="float" />
     <Field Name="LightID" Type="int" />
     <Field Name="Flags" Type="int" />
+    <Field Name="EmitterID" Type="int" />
   </Table>

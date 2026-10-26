@@ -14,11 +14,11 @@ namespace ia::lights {
         bool g_running = false;
 
         TableWatch g_properties("DoodadLightProperties");
-        TableWatch g_assignments("DoodadLightAssignment");
+        TableWatch g_assignments("DoodadSourceAssignment");
         std::string g_tableStatus = "not loaded yet";
         bool g_tableSent = false;
 
-        // DoodadLightProperties and DoodadLightAssignment to the client (WXL's features/DoodadLightTable).
+        // DoodadLightProperties and DoodadSourceAssignment to the client (WXL's features/DoodadLightTable).
         // A Properties float of -1 takes the default (the settings'); Intensity -1 the stock torches' 1.4.
         void SendTable(const sxc_lights_api* api) {
             std::vector<sxc_lights_kind> kinds;
@@ -57,7 +57,8 @@ namespace ia::lights {
 
             if (a) {
                 const int path = a.Field("ModelPath"), type = a.Field("AttachType"), index = a.Field("AttachIndex"), offset = a.Field("Offset"),
-                          direction = a.Field("Direction"), light = a.Field("LightID"), flags = a.Field("Flags");
+                          direction = a.Field("Direction"), light = a.Field("LightID"), flags = a.Field("Flags"),
+                          emitter = a.Field("EmitterID");
                 paths.reserve(a.RowCount());
 
                 for (uint32_t i = 0; i < a.RowCount(); i++) {
@@ -75,6 +76,7 @@ namespace ia::lights {
                     row.light_id = r.Uint(light);
                     row.flags = r.Uint(flags);
                     row.id = r.Id();
+                    row.emitter_id = emitter >= 0 ? r.Uint(emitter) : 0;
                     rows.push_back(row);
                 }
 
@@ -86,7 +88,7 @@ namespace ia::lights {
             api->set_table(kinds.empty() ? nullptr : kinds.data(), static_cast<uint32_t>(kinds.size()), rows.empty() ? nullptr : rows.data(),
                            static_cast<uint32_t>(rows.size()));
             char line[160];
-            std::snprintf(line, sizeof(line), "%u light(s) in DoodadLightProperties%s, %u assignment(s) in DoodadLightAssignment%s", static_cast<unsigned>(kinds.size()),
+            std::snprintf(line, sizeof(line), "%u light(s) in DoodadLightProperties%s, %u assignment(s) in DoodadSourceAssignment%s", static_cast<unsigned>(kinds.size()),
                           p.Loaded() ? "" : " (no file)", static_cast<unsigned>(rows.size()), a.Loaded() ? "" : " (no file)");
             g_tableStatus = line;
         }

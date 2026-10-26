@@ -19,6 +19,7 @@
 #include "climate/Climate.h"
 #include "cover/Cover.h"
 #include "env/CoverTable.h"
+#include "env/Emitters.h"
 #include "env/Fields.h"
 #include "env/Materials.h"
 #include "env/Regional.h"
@@ -56,7 +57,7 @@ namespace {
         "AreaClimate", "WindProfile", "FogSettings",
         "GroundMaterial", "GroundMaterialSelector", "SurfaceCover",
         "GroundEffectDoodadWind", "GroundEffectDoodadDensity",
-        "DoodadLightProperties", "DoodadLightAssignment",
+        "DoodadLightProperties", "DoodadEmitterProperties", "DoodadSourceAssignment",
     };
 
     void DrawOverview(void*) {
@@ -192,6 +193,7 @@ namespace {
                     ia::fields::Reset();
                     ia::regional::Reset();
                     ia::shelter::Clear();
+                    ia::emitters::Reset();
                     m_envRunning = false;
                 }
 
@@ -202,6 +204,7 @@ namespace {
             prof::Enter(prof::kGround);
             ia::materials::Update();
             ia::covertable::Update();
+            ia::emitters::Update();   // before the wind and the fields: they take them
             prof::Leave(prof::kGround);
             { prof::Scope p(prof::kWind); ia::wind::Update(dt, snap); }
             { prof::Scope p(prof::kGrass); ia::grass::Update(dt, snap); }

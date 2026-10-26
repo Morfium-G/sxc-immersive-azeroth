@@ -52,9 +52,12 @@ tables under the Data view.
   wind, pushed aside by characters; far fog to the horizon.
 - **Covers** (SurfaceCover, Vulkan): snow, sand, mud and ash as part of the terrain, with depth, drifts,
   their own textures and wetness; characters sink in and leave trenches that fill back in.
-- **Lights** (DoodadLightProperties, DoodadLightAssignment, Vulkan): per-pixel point and spot lights on
+- **Lights** (DoodadLightProperties, DoodadSourceAssignment, Vulkan): per-pixel point and spot lights on
   the terrain, covers, models, WMOs and grass, indoor and outdoor apart, cube shadow maps from
-  buildings, the terrain and doodads; an in-game light editor.
+  buildings, the terrain, doodads and game objects, glowing in the fog; an in-game light editor.
+- **Emitters** (DoodadEmitterProperties, DoodadSourceAssignment): heat or cold, moisture and drafts on
+  models, placed like the lights; they warm or cool the air, melt snow, wet the ground and push the
+  wind. Edited in the light editor.
 - **Grass** (GroundEffectDoodadWind, GroundEffectDoodadDensity, Vulkan): drawn instanced on the GPU
   (much longer grass distances), swaying in the wind, parting around characters, denser near you, lit
   by the lights; soft edges and ground effects placed by how much of a layer is painted.

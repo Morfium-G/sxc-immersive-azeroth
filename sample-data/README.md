@@ -20,7 +20,7 @@ every third night, Outland's own sky); delete them freely.
 | GroundMaterial, GroundMaterialSelector | 22, 22 | Snow (by TerrainType, and named snow textures from Ironforge to Icecrown), desert and beach sands, Elwynn's dirt and the Swamp of Sorrows' muck (mud after rain), Burning Steppes' lava (a heat source), hot ash and hot rock |
 | SurfaceCover | 19 | Snow covers, sand covers with their own textures, mud that only forms on wet ground (MoistureMin), thin ash |
 | FogSettings | 7 | Fog colours and kinds for Swamp of Sorrows, Duskwood, Zangarmarsh and the Wetlands, whiter steam everywhere |
-| DoodadLightProperties, DoodadLightAssignment | 20, 163 | Torches, lanterns, candles, coloured flames, mushrooms and energy lights, on 155 models (torches, lampposts, braziers, wagons, cauldrons...), mostly at their particle emitters (the flame), some at bones or attachment points, a few replacing the model's own light |
+| DoodadLightProperties, DoodadSourceAssignment | 20, 163 | Torches, lanterns, candles, coloured flames, mushrooms and energy lights, on 155 models (torches, lampposts, braziers, wagons, cauldrons...), mostly at their particle emitters (the flame), some at bones or attachment points, a few replacing the model's own light |
 | GroundEffectDoodadDensity | 46 | A global 6x out to 1024 yd, then zones and single plant models from 1x to 8x (Darkshore, the Plaguelands, Teldrassil and others) |
 | GroundEffectDoodadWind | 37 | Plant models kept out of the wind (19) or out of the wind and the parting (18), several with a stiffness |
 

@@ -16,7 +16,7 @@ wxl_add_mod(immersive-azeroth
     SOURCES
         src/Mod.cpp src/Tables.cpp src/World.cpp src/Lua.cpp src/Profiler.cpp src/Saved.cpp
         src/climate/Climate.cpp
-        src/env/Shelter.cpp src/env/Wind.cpp src/env/Materials.cpp src/env/CoverTable.cpp src/env/Regional.cpp src/env/Fields.cpp
+        src/env/Shelter.cpp src/env/Wind.cpp src/env/Materials.cpp src/env/CoverTable.cpp src/env/Regional.cpp src/env/Fields.cpp src/env/Emitters.cpp
         src/fog/Fog.cpp src/fog/Field.cpp src/fog/FogSettings.cpp src/fog/Far.cpp src/fog/Wake.cpp
         src/cover/Cover.cpp
         src/lights/Lights.cpp

@@ -9,6 +9,7 @@
 #include <vector>
 #include "climate/Climate.h"
 #include "env/CoverTable.h"
+#include "env/Emitters.h"
 #include "env/Materials.h"
 #include "env/Regional.h"
 #include "env/Shelter.h"
@@ -728,8 +729,64 @@ namespace ia::fields {
             blur(false);
         }
 
+        // The emitters (env/Emitters) on the grid, per cell (b * kSize + a): the strongest temperature
+        // source's reach and its degC, and how much the moisture ones wet the ground (0..1). Each stamps only
+        // the cells within its radius (3D: a brazier on a tower doesn't warm the street below).
+        std::vector<float> g_emitHeat(kSize * kSize), g_emitHeatTemp(kSize * kSize), g_emitWet(kSize * kSize);
+        bool g_anyEmitters = false;
+
+        void StampEmitters() {
+            if (g_anyEmitters) {
+                std::fill(g_emitHeat.begin(), g_emitHeat.end(), 0.0f);
+                std::fill(g_emitWet.begin(), g_emitWet.end(), 0.0f);
+                g_anyEmitters = false;
+            }
+
+            for (const emitters::Emitter& e : emitters::All()) {
+                if (e.type != emitters::kTemperature && e.type != emitters::kMoisture) {
+                    continue;
+                }
+
+                const int ca = static_cast<int>(std::floor(e.pos[0] / kCell)) - g_firstI;
+                const int cb = static_cast<int>(std::floor(e.pos[1] / kCell)) - g_firstJ;
+                const int r = static_cast<int>(std::ceil(e.radius / kCell));
+
+                for (int b = std::max(cb - r, 0); b <= std::min(cb + r, kSize - 1); b++) {
+                    for (int a = std::max(ca - r, 0); a <= std::min(ca + r, kSize - 1); a++) {
+                        const Cell* c = Live(a, b);
+
+                        if (!c) {
+                            continue;
+                        }
+
+                        const float d[3] = { (c->i + 0.5f) * kCell - e.pos[0], (c->j + 0.5f) * kCell - e.pos[1], c->z - e.pos[2] };
+                        const float dist = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+                        const float reach = emitters::Reach(e, dist) * emitters::Cone(e, d, dist);   // a drip: only below it
+
+                        if (reach <= 0.0f) {
+                            continue;
+                        }
+
+                        const int k = b * kSize + a;
+                        g_anyEmitters = true;
+
+                        if (e.type == emitters::kTemperature) {
+                            if (reach > g_emitHeat[k]) {
+                                g_emitHeat[k] = reach;
+                                g_emitHeatTemp[k] = e.strength;
+                            }
+                        } else {
+                            const float wet = std::fmin(std::fmax(e.strength, 0.0f), 1.0f) * reach;
+                            g_emitWet[k] = 1.0f - (1.0f - g_emitWet[k]) * (1.0f - wet);
+                        }
+                    }
+                }
+            }
+        }
+
         // One step for every cell: temperature, snow, moisture.
         void Tick(float dt) {
+            StampEmitters();
             const double t0 = NowMs();
             const climate::Weather& weather = climate::CurrentWeather();
             const bool raining = weather.type == 1 && weather.intensity > 0.0f;
@@ -773,11 +830,15 @@ namespace ia::fields {
                         lastZone = c.zone;
                     }
 
-                    // The ground's temperature: the air, moved by a hot liquid or hot ground nearby,
-                    // whichever moves it more (they don't add up).
+                    // The ground's temperature: the air, moved by a hot liquid, hot ground or an emitter
+                    // nearby, whichever moves it more (they don't add up). An emitter's degC is the air's
+                    // right at it: the spot goes all the way there at the source.
                     const float fromLiquid = c.nearHot ? c.heat * kHeatShare * (c.nearTemp - temperature) : 0.0f;
                     const float fromGround = c.groundHeat > 0.0f ? c.groundHeat * kHeatShare * (c.groundHeatTemp - temperature) : 0.0f;
-                    c.temperature = temperature + (std::fabs(fromGround) > std::fabs(fromLiquid) ? fromGround : fromLiquid);
+                    const float fromEmitter = g_emitHeat[k] > 0.0f ? g_emitHeat[k] * (g_emitHeatTemp[k] - temperature) : 0.0f;
+                    float moved = std::fabs(fromGround) > std::fabs(fromLiquid) ? fromGround : fromLiquid;
+                    moved = std::fabs(fromEmitter) > std::fabs(moved) ? fromEmitter : moved;
+                    c.temperature = temperature + moved;
 
                     // --- snow (env/Snow.h) ---
                     // Effective temperature: the surface (the ground's, toward a hot material's own by its
@@ -796,6 +857,10 @@ namespace ia::fields {
 
                     if (c.hotShare >= kHotGroundShare && c.hotTemp >= snow::kHotSource) {
                         reach = 1.0f;
+                    }
+
+                    if (g_emitHeatTemp[k] >= snow::kHotSource && g_emitHeat[k] > reach) {
+                        reach = g_emitHeat[k];
                     }
 
                     // Fallen snow follows its zones' (blended), less where this spot is warmer than they are.
@@ -858,9 +923,12 @@ namespace ia::fields {
                     const float eq = Equilibrium(c, c.temperature, humidity);
                     const float mix = soak[k];
                     const float rainShare = raining && c.open > 0.0f ? share[k] * c.open : 0.0f;
+                    // A moisture emitter (a drip, a fountain) wets it like water nearby: at its absorbency.
+                    const float emitWet = g_emitWet[k] < 0.999f ? g_emitWet[k] : 0.999f;
                     const float target = c.submerged ? c.liquidMoisture
                                                      : 1.0f - (1.0f - eq) * std::pow(1.0f - (mix < 0.999f ? mix : 0.999f), c.absorbency * c.open) *
-                                                                  std::pow(1.0f - (c.meltWet < 0.999f ? c.meltWet : 0.999f), c.absorbency);
+                                                                  std::pow(1.0f - (c.meltWet < 0.999f ? c.meltWet : 0.999f), c.absorbency) *
+                                                                  std::pow(1.0f - emitWet, c.absorbency);
                     const float before = c.value;
 
                     if (!c.started) {

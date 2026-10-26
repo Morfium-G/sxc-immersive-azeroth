@@ -150,18 +150,37 @@ namespace {
         return s;
     }
 
-    Schema DoodadLightAssignment() {
-        Schema s("DoodadLightAssignment", "DBFilesClient\\DoodadLightAssignment.cdbc");
-        s.Description("Where doodad lights go. Several rows per model are fine.");
+    Schema DoodadEmitterProperties() {
+        Schema s("DoodadEmitterProperties", "DBFilesClient\\DoodadEmitterProperties.cdbc");
+        s.Description("What a doodad emitter does to the world around it: warms or cools it, wets it, or blows (a draft).");
+        s.Id();
+        s.String("Name");
+        s.Enum("Type").Value(0, "temperature").Value(1, "moisture").Value(2, "draft");
+        s.Float("Strength").Tooltip("Temperature: the air's degrees C right at the source (a brazier ~40, a forge ~60, an ice block -15; "
+                                    "from 30 it melts the snow around it); "
+                                                  "moisture: how wet it makes the ground at the source, 0..1; draft: the wind's strength at the source (1 = a strong wind).");
+        Inherit(s.Float("Radius")).Tooltip("Yards (x the model's scale); nothing beyond. Default 8.");
+        Inherit(s.Float("Falloff")).Tooltip("Shape: 1 smooth (default), higher = tighter around the source.");
+        Inherit(s.Float("Spread")).Range(0, 180).Tooltip("Degrees from the row's Direction the emitter reaches (a drip: a narrow cone down; 180: every way, "
+                                                         "a draft then blows outward). Default 180, drafts 30.");
+        s.Flags("Flags").Tooltip("Reserved, 0.");
+        return s;
+    }
+
+    Schema DoodadSourceAssignment() {
+        Schema s("DoodadSourceAssignment", "DBFilesClient\\DoodadSourceAssignment.cdbc");
+        s.FormerPath("DBFilesClient\\DoodadLightAssignment.cdbc");
+        s.Description("Where doodad lights and emitters go: a light, an emitter or both per row. Several rows per model are fine.");
         s.Id();
         s.Path("ModelPath").Tooltip("The model's path as the lights panel shows it; case and / vs \\ don't matter.");
         s.Enum("AttachType").Value(0, "origin").Value(1, "attachment point").Value(2, "bone").Value(3, "particle emitter").Group("Attachment");
         s.Int("AttachIndex").Group("Attachment").Tooltip("The attachment point ID / bone index / emitter index.");
         s.String("AttachName").ReadOnly().Group("Attachment").Tooltip("Reserved for named attachment points, empty.");
         s.Vector("Offset").Group("Attachment").Tooltip("Yards from the attachment, in the model's space (scaled with the doodad).");
-        s.Vector("Direction").Tooltip("Spot lights: where the cone points, in the model's space (0, 0, -1 = down).");
+        s.Vector("Direction").Tooltip("Spot lights: where the cone points; drafts: where they blow. In the model's space (0, 0, -1 = down).");
         s.ForeignKey("LightID", "DoodadLightProperties").Value(0, "no light");
         s.Flags("Flags").Bit(0x1, "suppress the model's own lights");
+        s.ForeignKey("EmitterID", "DoodadEmitterProperties").Value(0, "no emitter");
         return s;
     }
 
@@ -339,7 +358,7 @@ namespace {
 namespace ia {
     void RegisterTables() {
         Schema (*const schemas[])() = {
-            AreaClimate, DoodadLightAssignment, DoodadLightProperties, FogSettings, GroundEffectDoodadDensity, GroundEffectDoodadWind,
+            AreaClimate, DoodadEmitterProperties, DoodadLightProperties, DoodadSourceAssignment, FogSettings, GroundEffectDoodadDensity, GroundEffectDoodadWind,
             GroundMaterial, GroundMaterialSelector, SkyBody, SkyBodySet, SkyBodySetMember, SkyPath, SkyPathKey, SkyProfile, SkyTime,
             SurfaceCover, WindProfile,
         };

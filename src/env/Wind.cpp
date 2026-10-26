@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "TableWatch.h"
+#include "env/Emitters.h"
 #include "env/Shelter.h"
 
 namespace ia::wind {
@@ -254,6 +255,22 @@ namespace ia::wind {
         s.open = steady > 0.0f ? shelter::Openness(pos) : 1.0f;
         s.lee = steady > 0.0f && s.open > 0.0f ? shelter::Lee(pos, dx, dy) : 1.0f;
         s.strength = steady * (1.0f + p[GustStrength] * s.gust) * s.open * s.lee * g_strengthMultiplier;
+
+        // Drafts (env/Emitters): added after the shelter (a draft blows where it is, roof or lee).
+        float draftX = 0.0f, draftY = 0.0f;
+        emitters::DraftAt(pos, draftX, draftY);
+
+        if (draftX != 0.0f || draftY != 0.0f) {
+            const float x = s.dirX * s.strength + draftX, y = s.dirY * s.strength + draftY;
+            const float len = std::sqrt(x * x + y * y);
+            s.strength = len;
+
+            if (len > 1e-4f) {
+                s.dirX = x / len;
+                s.dirY = y / len;
+            }
+        }
+
         return s;
     }
 
