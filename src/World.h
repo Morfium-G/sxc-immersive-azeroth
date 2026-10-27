@@ -96,6 +96,9 @@ namespace ia::terrain {
         float weight[4] = {};
         Surface surface[4];
         int dominant = -1; // the client's own dominant layer for the cell
+        uint32_t layerFlags[4] = {};   // MCLY
+        uint32_t textureFlags[4] = {};    // MTXF as applied (bits 4-7: retail's texture scale)
+        uint32_t adtTextureFlags[4] = {}; // MTXF as the ADT has it (before TerrainTextureParams)
     };
     bool LayerWeightsAt(float x, float y, LayerWeights& out);
 

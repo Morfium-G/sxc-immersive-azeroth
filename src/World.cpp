@@ -200,6 +200,9 @@ namespace ia::terrain {
         for (int l = 0; l < out.layers; l++) {
             out.weight[l] = s.layers[l].weight;
             out.surface[l] = SurfaceOf(s, l);
+            out.layerFlags[l] = s.layer_flags[l];
+            out.textureFlags[l] = s.texture_flags[l];
+            out.adtTextureFlags[l] = s.adt_texture_flags[l];
         }
 
         return true;

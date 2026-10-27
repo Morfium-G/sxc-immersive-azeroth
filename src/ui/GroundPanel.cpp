@@ -20,13 +20,14 @@ namespace ia::ui {
                 return;
             }
 
-            if (!ImGui::BeginTable("##layers", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+            if (!ImGui::BeginTable("##layers", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
                 return;
             }
 
             ImGui::TableSetupColumn("layer");
             ImGui::TableSetupColumn("painted");
             ImGui::TableSetupColumn("texture");
+            ImGui::TableSetupColumn("flags");
             ImGui::TableSetupColumn("effect / type");
             ImGui::TableSetupColumn("material");
             ImGui::TableHeadersRow();
@@ -41,6 +42,29 @@ namespace ia::ui {
                 ImGui::Text("%.2f", lw.weight[l]);
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(sf.texture ? sf.texture : "");
+                ImGui::TableNextColumn();
+                {
+                    // MCLY: 0x400 reflective (a cube map). MTXF: 0x1 no specular, bits 4-7 retail's
+                    // texture scale (1 << n), which 3.3.5 ignores: a converted map may carry it.
+                    const uint32_t mcly = lw.layerFlags[l], mtxf = lw.textureFlags[l], adt = lw.adtTextureFlags[l];
+                    const uint32_t scale = (mtxf >> 4) & 0xFu;
+                    ImGui::Text("MCLY 0x%X  MTXF 0x%X", mcly, mtxf);
+
+                    if (adt != mtxf) {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("(ADT 0x%X, TerrainTextureParams)", adt);
+                    }
+
+                    if (scale) {
+                        ImGui::SameLine();
+                        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "scale x%u", 1u << scale);
+                    }
+
+                    if (mcly & 0x400) {
+                        ImGui::SameLine();
+                        ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "reflective");
+                    }
+                }
                 ImGui::TableNextColumn();
                 ImGui::Text("%u / %d", sf.groundEffect, sf.terrainType);
                 ImGui::TableNextColumn();
