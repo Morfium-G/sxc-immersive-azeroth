@@ -6,6 +6,7 @@
 #include "SXC/Api/sxc_cover.h"
 #include "env/Fields.h"
 #include "env/Materials.h"
+#include "env/Wind.h"
 #include "wxl/sdk.hpp"
 
 namespace ia::cover {
@@ -152,6 +153,9 @@ namespace ia::cover {
             look.trail_reach = g_look.trailReach;
             look.trail_carve = g_look.trailCarve;
             look.trail_lift = g_look.trailLift;
+            // Covers level sooner in steady wind (the terrain's pattern fades under thinner snow).
+            const float wind = wind::SteadyGround();
+            look.steady_wind = wind < 0.0f ? 0.0f : (wind > 1.0f ? 1.0f : wind);
 
             for (int k = 0; k < 3; k++) {
                 look.outside[k] = maps.outside[k];
