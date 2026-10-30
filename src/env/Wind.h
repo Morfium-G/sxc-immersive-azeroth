@@ -57,4 +57,7 @@ namespace ia::wind {
     // Testing: < 0 follows the live weather, 0..1 forces an intensity.
     void SetWeatherOverride(float intensity);
     float WeatherOverride();
+    // Testing: < 0 follows the profile, 0..360 forces the steady direction (the bearing it blows toward).
+    void SetDirectionOverride(float bearingDegrees);
+    float DirectionOverride();
 }

@@ -37,6 +37,7 @@ namespace ia::wind {
 
         float g_time = 0.0f;
         float g_weatherOverride = -1.0f;
+        float g_directionOverride = -1.0f;   // testing: the forced bearing, < 0 none
         float g_strengthMultiplier = 1.0f;
         float g_weatherUsed = 0.0f;
         float g_steadyGround = 0.0f, g_steadyAloft = 0.0f, g_bearing = 0.0f;
@@ -221,7 +222,7 @@ namespace ia::wind {
         // toward the locked direction by LockStrength.
         float bearing = MapBaseBearing(snap.mapId) + 60.0f * (Noise1(g_time / 90.0f + 3.1f) * 2.0f - 1.0f);
         bearing += AngleDelta(bearing, p[LockedDirection]) * Clamp01(p[LockStrength]);
-        g_bearing = std::fmod(bearing + 360.0f, 360.0f);
+        g_bearing = g_directionOverride >= 0.0f ? std::fmod(g_directionOverride, 360.0f) : std::fmod(bearing + 360.0f, 360.0f);
     }
 
     Sample At(const float pos[3], float heightAboveGround) {
@@ -286,4 +287,6 @@ namespace ia::wind {
     float StrengthMultiplier() { return g_strengthMultiplier; }
     void SetWeatherOverride(float intensity) { g_weatherOverride = intensity; }
     float WeatherOverride() { return g_weatherOverride; }
+    void SetDirectionOverride(float bearingDegrees) { g_directionOverride = bearingDegrees; }
+    float DirectionOverride() { return g_directionOverride; }
 }

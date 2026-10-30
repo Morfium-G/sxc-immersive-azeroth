@@ -30,6 +30,8 @@ namespace ia::ui {
 
         bool g_weatherTest = false;
         float g_weatherTestValue = 1.0f;
+        bool g_directionTest = false;
+        float g_directionTestValue = 0.0f;
 
         // --- arrows in the world -------------------------------------------------------------------------
         bool g_showArrows = false;
@@ -225,5 +227,18 @@ namespace ia::ui {
         }
 
         ImGui::SetItemTooltip("Only what the wind sees. For real weather (rain falling, everything following it), use the Climate panel's weather.");
+
+        changed = ImGui::Checkbox("force the direction", &g_directionTest);
+        ImGui::SameLine();
+        changed |= ImGui::SliderFloat("##direction", &g_directionTestValue, 0.0f, 359.0f, "toward %.0f deg");
+        ImGui::SameLine();
+        ImGui::TextUnformatted(Compass(g_directionTestValue));
+
+        if (changed) {
+            wind::SetDirectionOverride(g_directionTest ? g_directionTestValue : -1.0f);
+        }
+
+        ImGui::SetItemTooltip("The steady wind blows toward this bearing (0 north, 90 east) everywhere: grass, fog and the water's waves "
+                              "follow. Local veers, lees and drafts still apply.");
     }
 }
