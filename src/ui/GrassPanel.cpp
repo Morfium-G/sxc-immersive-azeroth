@@ -1,9 +1,14 @@
 #include "ui/Panels.h"
 
+#include "SXC/Api/sxc_cover.h"
+#include "World.h"
+#include "env/Marks.h"
 #include "grass/Grass.h"
 #include "imgui.h"
 
 namespace ia::ui {
+    void DrawMarks();
+
     void DrawGrass(void*) {
         grass::Settings& s = grass::Config();
 
@@ -175,5 +180,60 @@ namespace ia::ui {
         editing = active;
         ImGui::Checkbox("Same texture only", &s.edgeSameTexture);
         ImGui::SetItemTooltip("Spill only onto bare ground painted with the same terrain texture (off: any bare ground).");
+
+        DrawMarks();
+    }
+
+    // The ground marks (env/Marks): burnt and frozen plants.
+    void DrawMarks() {
+        marks::Settings& m = marks::Config();
+        const marks::Stats st = marks::GetStats();
+        const world::Snapshot& snap = world::Current();
+
+        ImGui::SeparatorText("Marks: burnt and frozen");
+
+        if (!st.sent && m.enabled) {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "This client has no ground marks (sxc.cover / sxc.grass set_marks): update it.");
+        }
+
+        ImGui::Text("%u cells burnt (most %.2f), %u frozen (most %.2f); step %.2f ms", st.burnt, st.mostBurnt, st.frozen, st.mostFrozen, st.ms);
+        ImGui::Text("Here: burnt %.2f, frozen %.2f", marks::At(snap.playerPos, SXC_MARK_BURN), marks::At(snap.playerPos, SXC_MARK_FROST));
+        ImGui::Checkbox("Heat burns, cold freezes", &m.enabled);
+        ImGui::SliderFloat("Burns from", &m.burnAt, 30.0f, 500.0f, "%.0f degC");
+        ImGui::SetItemTooltip("The ground's temperature: the air moved by heat sources (emitters, lava, hot ground).");
+        ImGui::SliderFloat("Burnt through in", &m.burnSeconds, 1.0f, 300.0f, "%.0f s");
+        ImGui::SliderFloat("Grows back in", &m.regrowSeconds, 10.0f, 7200.0f, "%.0f s");
+        ImGui::SliderFloat("Soot fades in", &m.sootSeconds, 0.5f, 120.0f, "%.1f s");
+        ImGui::SetItemTooltip("Once the heat is gone the plants lose their black over this; what burnt away grows back green.");
+        ImGui::SliderFloat("Freezes below", &m.freezeAt, -60.0f, 10.0f, "%.0f degC");
+        ImGui::SliderFloat("...and below the air by", &m.freezeBelowAir, 0.0f, 40.0f, "%.0f degC");
+        ImGui::SetItemTooltip("A cold source, not a cold place: a snowy zone doesn't freeze its own grass.");
+        ImGui::SliderFloat("Frozen through in", &m.freezeSeconds, 1.0f, 300.0f, "%.0f s");
+        ImGui::SliderFloat("Thaws in", &m.thawSeconds, 5.0f, 3600.0f, "%.0f s");
+        ImGui::SliderFloat("Burnt black", &m.burnTint, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Burnt size", &m.burnSize, 0.0f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("Size of a fully burnt plant (0: burnt away).");
+        ImGui::SliderFloat("Frost tint", &m.frostTint, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Frozen in the wind x", &m.frostWind, 0.0f, 1.0f, "%.2f");
+        ImGui::TextDisabled("Per plant model: GroundEffectDoodadWind's \"no marks\" (stones).");
+
+        ImGui::TextUnformatted("Testing (not saved):");
+        ImGui::SameLine();
+
+        if (ImGui::Button("Burn here")) {
+            marks::Deposit(snap.playerPos, SXC_MARK_BURN, 1.0f, 6.0f);
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Freeze here")) {
+            marks::Deposit(snap.playerPos, SXC_MARK_FROST, 1.0f, 6.0f);
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Clear marks")) {
+            marks::Clear();
+        }
     }
 }

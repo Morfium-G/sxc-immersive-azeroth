@@ -21,6 +21,7 @@
 #include "env/CoverTable.h"
 #include "env/Emitters.h"
 #include "env/Fields.h"
+#include "env/Marks.h"
 #include "env/Materials.h"
 #include "env/Regional.h"
 #include "env/Shelter.h"
@@ -189,6 +190,7 @@ namespace {
                     ia::cover::Stop();
                     ia::lights::Stop();
                     ia::grass::Stop();
+                    ia::marks::Stop();
                     ia::fog::Reset();
                     ia::fields::Reset();
                     ia::regional::Reset();
@@ -205,11 +207,12 @@ namespace {
             ia::materials::Update();
             ia::covertable::Update();
             ia::emitters::Update();   // before the wind and the fields: they take them
+            ia::emitters::Impacts(dt);
             prof::Leave(prof::kGround);
             { prof::Scope p(prof::kWind); ia::wind::Update(dt, snap); }
             { prof::Scope p(prof::kGrass); ia::grass::Update(dt, snap); }
             { prof::Scope p(prof::kRegional); ia::regional::Update(dt, snap); }
-            { prof::Scope p(prof::kFields); ia::fields::Update(dt, snap); }
+            { prof::Scope p(prof::kFields); ia::fields::Update(dt, snap); ia::marks::Update(dt, snap); }
             prof::Enter(prof::kFogField);
             ia::fogsettings::Update();
             ia::fog::Update(dt, snap);

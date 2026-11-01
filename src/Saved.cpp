@@ -1,6 +1,7 @@
 #include "Saved.h"
 
 #include "cover/Cover.h"
+#include "env/Marks.h"
 #include "env/Shelter.h"
 #include "fog/Field.h"
 #include "fog/Fog.h"
@@ -99,6 +100,24 @@ namespace ia::saved {
             Value<CoverLook>("ThinDepth", "Covers: snow hides the ground from", "Yards of fallen snow from which the ground is hidden.", &CoverLook::thinDepth, 0.005f, 0.5f),
         });
 
+        using Marks = marks::Settings;
+
+        Block<Marks> g_marks("ImmersiveAzerothMarks", {
+            Flag<Marks>("Enabled", "Marks: on", "Heat burns plants, cold freezes them; they grow back and thaw.", &Marks::enabled),
+            Value<Marks>("BurnAt", "Marks: burns from", "Degrees C of the ground (air moved by heat sources).", &Marks::burnAt, 30.0f, 500.0f),
+            Value<Marks>("BurnSeconds", "Marks: burnt through in", "Seconds at the threshold (faster hotter).", &Marks::burnSeconds, 1.0f, 300.0f),
+            Value<Marks>("RegrowSeconds", "Marks: grows back in", "Seconds once the heat is gone.", &Marks::regrowSeconds, 10.0f, 7200.0f),
+            Value<Marks>("SootSeconds", "Marks: soot fades in", "Seconds the black takes to go once the heat is gone.", &Marks::sootSeconds, 0.5f, 120.0f),
+            Value<Marks>("FreezeAt", "Marks: freezes below", "Degrees C of the ground...", &Marks::freezeAt, -60.0f, 10.0f),
+            Value<Marks>("FreezeBelowAir", "Marks: ...and this far below the air", "Degrees C: a cold source, not a cold place.", &Marks::freezeBelowAir, 0.0f, 40.0f),
+            Value<Marks>("FreezeSeconds", "Marks: frozen through in", "Seconds.", &Marks::freezeSeconds, 1.0f, 300.0f),
+            Value<Marks>("ThawSeconds", "Marks: thaws in", "Seconds at the threshold (faster warmer).", &Marks::thawSeconds, 5.0f, 3600.0f),
+            Value<Marks>("BurnTint", "Marks: burnt black", "How black burnt plants get.", &Marks::burnTint, 0.0f, 1.0f),
+            Value<Marks>("BurnSize", "Marks: burnt size", "Size of a fully burnt plant (0: gone).", &Marks::burnSize, 0.0f, 1.0f),
+            Value<Marks>("FrostTint", "Marks: frost tint", "How pale blue frozen plants get.", &Marks::frostTint, 0.0f, 1.0f),
+            Value<Marks>("FrostWind", "Marks: frozen in the wind x", "x the wind on fully frozen plants (stiff).", &Marks::frostWind, 0.0f, 1.0f),
+        });
+
         // The wind panel's shelter: functions, not a struct; mirrored here.
         struct Shelter {
             bool roofs = true;
@@ -146,6 +165,7 @@ namespace ia::saved {
         g_wake.Sync(fog::wake::Config());
         g_lights.Sync(lights::Config());
         g_cover.Sync(cover::LookSettings());
+        g_marks.Sync(marks::Config());
         SyncShelter();
     }
 }

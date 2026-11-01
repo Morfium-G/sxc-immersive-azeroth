@@ -53,7 +53,8 @@ namespace {
         Schema s("GroundEffectDoodadWind", "DBFilesClient\\GroundEffectDoodadWind.cdbc");
         s.Description("Per-doodad grass overrides: a row replaces the automatic values for that doodad.");
         s.Id().Tooltip("GroundEffectDoodad.dbc ID.");
-        s.Flags("Flags").Bit(0x1, "no wind").Bit(0x2, "no push").Bit(0x4, "droop when wet (reserved)").Bit(0x8, "water current (reserved)").Bit(0x10, "flip root/tip");
+        s.Flags("Flags").Bit(0x1, "no wind").Bit(0x2, "no push").Bit(0x4, "droop when wet (reserved)").Bit(0x8, "water current (reserved)").Bit(0x10, "flip root/tip")
+            .Bit(0x20, "no marks (doesn't burn or freeze)");
         s.Float("Stiffness").Range(0, 1).Tooltip("0 flexible .. 1 rigid (scales wind and push).");
         s.Float("RootV").Label("Root V").Value(-1, "automatic").Default(-1).Tooltip("Manual bend mapping in texture V; -1 = automatic from the model geometry.");
         s.Float("TipV").Label("Tip V").Value(-1, "automatic").Default(-1);
@@ -152,15 +153,19 @@ namespace {
 
     Schema DoodadEmitterProperties() {
         Schema s("DoodadEmitterProperties", "DBFilesClient\\DoodadEmitterProperties.cdbc");
-        s.Description("What a doodad emitter does to the world around it: warms or cools it, wets it, or blows (a draft).");
+        s.Description("What a doodad emitter does to the world around it: warms or cools it, wets it, blows (a draft), or drops onto the water "
+                      "(an impact).");
         s.Id();
         s.String("Name");
-        s.Enum("Type").Value(0, "temperature").Value(1, "moisture").Value(2, "draft");
+        s.Enum("Type").Value(0, "temperature").Value(1, "moisture").Value(2, "draft").Value(3, "impact");
         s.Float("Strength").Tooltip("Temperature: the air's degrees C right at the source (a brazier ~40, a forge ~60, an ice block -15; "
                                     "from 30 it melts the snow around it); "
-                                                  "moisture: how wet it makes the ground at the source, 0..1; draft: the wind's strength at the source (1 = a strong wind).");
-        Inherit(s.Float("Radius")).Tooltip("Yards (x the model's scale); nothing beyond. Default 8.");
-        Inherit(s.Float("Falloff")).Tooltip("Shape: 1 smooth (default), higher = tighter around the source.");
+                                                  "moisture: how wet it makes the ground at the source, 0..1; draft: the wind's strength at the source (1 = a strong wind); "
+                                                  "impact: drops a second landing on the water (a cave drip ~0.5, a waterfall's foot ~200). An impact acts only where its "
+                                                  "row moved it to a water surface (the row's \"to the water surface\" flag).");
+        Inherit(s.Float("Radius")).Tooltip("Yards (x the model's scale); nothing beyond. Default 8. Impact: how widely its drops scatter around the point "
+                                           "(a drip ~0.1, a waterfall ~4).");
+        Inherit(s.Float("Falloff")).Tooltip("Shape: 1 smooth (default), higher = tighter around the source. Impact: the drops' size, their width and how deep they press the water (default 1: three times a raindrop's depth; a waterfall's foot 2..4).");
         Inherit(s.Float("Spread")).Range(0, 180).Tooltip("Degrees from the row's Direction the emitter reaches (a drip: a narrow cone down; 180: every way, "
                                                          "a draft then blows outward). Default 180, drafts 30.");
         s.Flags("Flags").Tooltip("Reserved, 0.");
@@ -179,7 +184,15 @@ namespace {
         s.Vector("Offset").Group("Attachment").Tooltip("Yards from the attachment, in the model's space (scaled with the doodad).");
         s.Vector("Direction").Tooltip("Spot lights: where the cone points; drafts: where they blow. In the model's space (0, 0, -1 = down).");
         s.ForeignKey("LightID", "DoodadLightProperties").Value(0, "no light");
-        s.Flags("Flags").Bit(0x1, "suppress the model's own lights");
+        s.Flags("Flags")
+            .Bit(0x1, "suppress the model's own lights")
+            .Bit(0x2, "to the water surface (along Direction)")
+            .Bit(0x4, "to the ground surface (along Direction)")
+            .Bit(0x8, "off under water")
+            .Bit(0x10, "only under water")
+            .Tooltip("To a surface: the row's light and emitter move along Direction (up to 60 yd) to the first water or ground (terrain, WMOs) "
+                     "they meet, the nearer with both; nothing is placed where there is none (a drip's mark on the floor, bubbles at the surface). "
+                     "Under water: the light and emitter are placed only above, or only below, a water surface.");
         s.ForeignKey("EmitterID", "DoodadEmitterProperties").Value(0, "no emitter");
         return s;
     }

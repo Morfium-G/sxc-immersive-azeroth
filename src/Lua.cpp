@@ -1,10 +1,13 @@
 #include "Lua.h"
 
 #include <cmath>
+#include <optional>
 #include <string>
 #include "World.h"
 #include "climate/Climate.h"
+#include "SXC/Api/sxc_cover.h"
 #include "env/Fields.h"
+#include "env/Marks.h"
 #include "env/Wind.h"
 #include "sky/Bodies.h"
 #include "sky/Clock.h"
@@ -15,7 +18,7 @@
 namespace ia::lua {
     namespace {
         // Bump when functions are added (addons check it); never change what an existing one returns.
-        constexpr int kApiVersion = 2; // 2: GetGroundMoisture, GetField, GetFieldNames, GetWind; the ground's own temperature
+        constexpr int kApiVersion = 3; // 2: GetGroundMoisture, GetField, GetFieldNames, GetWind; the ground's own temperature. 3: MarkGround
 
         const char* WeatherName(int type) {
             switch (type) {
@@ -85,6 +88,30 @@ namespace ia::lua {
             }
 
             call.PushNumber(value);
+        }
+
+        // ImmersiveAzeroth_MarkGround(kind, amount, radius [, x, y]) -> true if marked
+        // Marks the ground at once (a spell: a frost nova, a fire blast): kind "burn", "frost" or "life"
+        // (amount -1..1: blight below 0, bloom above), amount 0..1 added (full in the middle, half at the
+        // edge), radius yd (at most 30), around the player or at world x, y (on the marks' grid near the
+        // player). The marks then fade as they always do.
+        void MarkGround(wxl::ScriptCall& call) {
+            const world::Snapshot& s = world::Current();
+            const std::string kind = Arg(call, 0);
+            const int channel = kind == "burn" ? SXC_MARK_BURN : kind == "frost" ? SXC_MARK_FROST : kind == "life" ? SXC_MARK_LIFE : -1;
+            const std::optional<double> amount = call.ArgCount() > 1 ? call.Number(1) : std::nullopt;
+            const std::optional<double> radius = call.ArgCount() > 2 ? call.Number(2) : std::nullopt;
+            const std::optional<double> x = call.ArgCount() > 4 ? call.Number(3) : std::nullopt;
+            const std::optional<double> y = call.ArgCount() > 4 ? call.Number(4) : std::nullopt;
+
+            if (!s.inWorld || channel < 0 || !amount || !radius || *radius <= 0.0) {
+                call.PushBool(false);
+                return;
+            }
+
+            const float at[3] = { x ? static_cast<float>(*x) : s.playerPos[0], y ? static_cast<float>(*y) : s.playerPos[1], s.playerPos[2] };
+            marks::Deposit(at, channel, static_cast<float>(*amount), static_cast<float>(*radius < 30.0 ? *radius : 30.0));
+            call.PushBool(true);
         }
 
         // ImmersiveAzeroth_GetFieldNames() -> name1, name2, ...
@@ -259,6 +286,7 @@ namespace ia::lua {
         script.RegisterFunction<&GetGroundMoisture>("ImmersiveAzeroth_GetGroundMoisture");
         script.RegisterFunction<&GetField>("ImmersiveAzeroth_GetField");
         script.RegisterFunction<&GetFieldNames>("ImmersiveAzeroth_GetFieldNames");
+        script.RegisterFunction<&MarkGround>("ImmersiveAzeroth_MarkGround");
         script.RegisterFunction<&GetWind>("ImmersiveAzeroth_GetWind");
         script.RegisterFunction<&GetSkyTime>("ImmersiveAzeroth_GetSkyTime");
         script.RegisterFunction<&GetSkyDate>("ImmersiveAzeroth_GetSkyDate");

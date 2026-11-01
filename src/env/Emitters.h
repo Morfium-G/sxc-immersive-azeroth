@@ -10,7 +10,7 @@
 #include <vector>
 
 namespace ia::emitters {
-    enum Type : int { kTemperature = 0, kMoisture = 1, kDraft = 2 };
+    enum Type : int { kTemperature = 0, kMoisture = 1, kDraft = 2, kImpact = 3 };
 
     struct Emitter {
         int type = kTemperature;
@@ -21,10 +21,14 @@ namespace ia::emitters {
         float falloff = 1.0f;
         float cosSpread = -1.0f; // cos of its spread around `dir` (-1: every way; a draft then blows outward)
         uint32_t row = 0, id = 0;
+        uint32_t surface = 0;    // SXC_LIGHTS_SURFACE_*: where its row moved it (an impact acts only on the water's)
     };
 
     // Once per frame, before the wind and the fields: last frame's placed emitters with their properties.
     void Update();
+
+    // Once per frame after Update: the impacts on the water drop into the client's ripple field (sxc.water).
+    void Impacts(float dt);
 
     // This frame's emitters (the client's range around the camera).
     const std::vector<Emitter>& All();
@@ -43,7 +47,8 @@ namespace ia::emitters {
 
     struct Stats {
         unsigned placed = 0;        // emitters the client placed
-        unsigned temperature = 0, moisture = 0, draft = 0;
+        unsigned temperature = 0, moisture = 0, draft = 0, impact = 0;
+        unsigned impactsOnWater = 0; // impacts their row put on a water surface (the others do nothing)
         unsigned unknown = 0;       // placed with an EmitterID that has no DoodadEmitterProperties row
     };
     Stats GetStats();

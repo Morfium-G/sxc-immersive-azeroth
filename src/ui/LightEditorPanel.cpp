@@ -150,7 +150,7 @@ namespace ia::ui {
             return t;
         }
 
-        const char* const kEmitterTypes[3] = { "temperature", "moisture", "draft" };
+        const char* const kEmitterTypes[4] = { "temperature", "moisture", "draft", "impact" };
 
         // The assignment rows of a model (ids), from an index rebuilt when the table changes.
         std::vector<uint32_t> RowsOf(const std::string& key) {
@@ -381,9 +381,16 @@ namespace ia::ui {
                 const std::string what = lightId && emitterId ? LightName(lightId) + " + " + EmitterName(emitterId)
                                          : emitterId           ? EmitterName(emitterId)
                                                                : LightName(lightId);
-                char header[260];
-                std::snprintf(header, sizeof header, "Row %u: %s at %s %d%s%s###row", id, what.c_str(), type < 4 ? kAttachTypes[type] : "?", r.Int(fIndex),
-                              (r.Uint(fFlags) & SXC_LIGHTS_SUPPRESS_MODEL_LIGHTS) ? ", own lights off" : "", lacks ? "  (MISSING: at the origin)" : "");
+                char header[360];
+                const uint32_t flags = r.Uint(fFlags);
+                std::snprintf(header, sizeof header, "Row %u: %s at %s %d%s%s%s%s%s###row", id, what.c_str(), type < 4 ? kAttachTypes[type] : "?", r.Int(fIndex),
+                              (flags & SXC_LIGHTS_SUPPRESS_MODEL_LIGHTS) ? ", own lights off" : "",
+                              (flags & SXC_LIGHTS_TO_WATER) && (flags & SXC_LIGHTS_TO_GROUND) ? ", to a surface"
+                              : (flags & SXC_LIGHTS_TO_WATER)                                  ? ", to the water"
+                              : (flags & SXC_LIGHTS_TO_GROUND)                                 ? ", to the ground"
+                                                                                               : "",
+                              (flags & SXC_LIGHTS_OFF_UNDER_WATER) ? ", off under water" : "", (flags & SXC_LIGHTS_ONLY_UNDER_WATER) ? ", only under water" : "",
+                              lacks ? "  (MISSING: at the origin)" : "");
 
                 if (lacks) {
                     ImGui::PushStyleColor(ImGuiCol_Text, kMissing);

@@ -67,6 +67,7 @@ namespace ia::fields {
             float nearMoisture = 0.0f, nearTemp = 0.0f, heat = 0.0f;
             bool nearHot = false;
             float temperature = 0.0f;                       // the ground's, last step (air + heat)
+            float air = 0.0f;                               // the place's air, last step (env/Marks: cold sources)
             float hotShare = 0.0f, hotTemp = 0.0f;          // painted strength of materials with a Temperature, and theirs
             float groundHeat = 0.0f, groundHeatTemp = 0.0f, groundHeatDist = -1.0f; // the nearest hot ground's reach here
             float open = 1.0f;
@@ -839,6 +840,7 @@ namespace ia::fields {
                     float moved = std::fabs(fromGround) > std::fabs(fromLiquid) ? fromGround : fromLiquid;
                     moved = std::fabs(fromEmitter) > std::fabs(moved) ? fromEmitter : moved;
                     c.temperature = temperature + moved;
+                    c.air = temperature;
 
                     // --- snow (env/Snow.h) ---
                     // Effective temperature: the surface (the ground's, toward a hot material's own by its
@@ -1062,6 +1064,18 @@ namespace ia::fields {
             default:
                 return false;
         }
+    }
+
+    bool GroundTemperature(const float pos[3], float& ground, float& air) {
+        const Cell* c = CellAt(pos);
+
+        if (!c || !c->started) {
+            return false;
+        }
+
+        ground = c->temperature;
+        air = c->air;
+        return true;
     }
 
     MoistureDetail Moisture(const float pos[3]) {

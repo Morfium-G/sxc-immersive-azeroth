@@ -30,6 +30,10 @@ namespace ia::fields {
     // that isn't loaded yet). Temperature is always known (the climate beyond the grid).
     bool Sample(int field, const float pos[3], float& out);
 
+    // The ground's temperature (degC: the air moved by hot liquids, hot ground, emitters) and the place's
+    // air there, on the grid only: false outside it or before its first step (env/Marks).
+    bool GroundTemperature(const float pos[3], float& ground, float& air);
+
     // Moisture details at a position, for the panel.
     struct MoistureDetail {
         bool known = false;

@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 #include "SXC/Api/sxc_lights.h"
+#include "SXC/Api/sxc_water.h"
+#include "wxl/sdk.hpp"
 #include "TableWatch.h"
 #include "lights/Lights.h"
 
@@ -15,6 +17,9 @@ namespace ia::emitters {
         constexpr float kDefaultRadius = 8.0f;
         constexpr float kDefaultSpread = 180.0f;     // degrees: temperature and moisture reach every way...
         constexpr float kDefaultDraftSpread = 30.0f; // ...a draft blows along its direction
+        constexpr float kImpactReach = 60.0f;        // yd from the camera: the ripple field's (its setting may show less)
+        constexpr float kDropRadius = 0.3f, kDropDepth = 0.15f;    // a drop's ripple at size 1 (three times a raindrop's depth), x the size
+        constexpr int kMostDrops = 48;               // per impact a frame (the field takes 256 stamps in all)
 
         struct Properties {
             int type = kTemperature;
@@ -28,6 +33,19 @@ namespace ia::emitters {
         std::vector<Emitter> g_emitters;
         std::vector<sxc_lights_emitter> g_placed;
         Stats g_stats;
+
+        const sxc_water_api* WaterApi() {
+            static const sxc_water_api* s_api =
+                wxl::Host() ? static_cast<const sxc_water_api*>(wxl::Host()->get_service(SXC_WATER_SERVICE, SXC_WATER_SERVICE_VERSION)) : nullptr;
+            return s_api && s_api->struct_size >= sizeof(sxc_water_api) ? s_api : nullptr;
+        }
+
+        uint32_t g_seed = 0x2545F491u;
+
+        float Random() {
+            g_seed = g_seed * 1664525u + 1013904223u;
+            return static_cast<float>(g_seed >> 8) * (1.0f / 16777216.0f);
+        }
 
         const sxc_lights_api* Api() {
             const sxc_lights_api* api = lights::EditorApi();
@@ -49,6 +67,8 @@ namespace ia::emitters {
                     p.strength = r.Float(strength);
                     p.radius = r.Float(radius) > 0.0f ? r.Float(radius) : kDefaultRadius;
                     p.falloff = r.Float(falloff) > 0.0f ? r.Float(falloff) : 1.0f;
+                    // An impact's radius is its drops' scatter: small by default (a drip).
+                    p.radius = p.type == kImpact && !(r.Float(radius) > 0.0f) ? 0.1f : p.radius;
                     p.spread = r.Float(spread) >= 0.0f ? r.Float(spread) : (p.type == kDraft ? kDefaultDraftSpread : kDefaultSpread);
                     g_properties[r.Id()] = p;
                 }
@@ -89,6 +109,11 @@ namespace ia::emitters {
             }
 
             const Properties& p = found->second;
+
+            if (p.type == kImpact && placed.distance > kImpactReach) {
+                continue;
+            }
+
             Emitter e;
             e.type = p.type;
             e.strength = p.strength;
@@ -97,6 +122,7 @@ namespace ia::emitters {
             e.cosSpread = p.spread >= 179.5f ? -1.0f : std::cos(p.spread * kRad);
             e.row = placed.row_id;
             e.id = placed.emitter_id;
+            e.surface = placed.surface;
 
             for (int k = 0; k < 3; k++) {
                 e.pos[k] = placed.pos[k];
@@ -107,10 +133,45 @@ namespace ia::emitters {
                 case kTemperature: g_stats.temperature++; break;
                 case kMoisture: g_stats.moisture++; break;
                 case kDraft: g_stats.draft++; break;
+                case kImpact:
+                    g_stats.impact++;
+                    g_stats.impactsOnWater += e.surface == SXC_LIGHTS_SURFACE_WATER ? 1 : 0;
+                    break;
                 default: continue;
             }
 
             g_emitters.push_back(e);
+        }
+    }
+
+    void Impacts(float dt) {
+        const sxc_water_api* water = g_stats.impactsOnWater ? WaterApi() : nullptr;
+
+        if (!water || !(dt > 0.0f) || dt > 0.5f) {
+            return;
+        }
+
+        for (const Emitter& e : g_emitters) {
+            if (e.type != kImpact || e.surface != SXC_LIGHTS_SURFACE_WATER || e.strength <= 0.0f) {
+                continue;
+            }
+
+            // The drops this frame: the rate's whole part, and one more by chance for the rest.
+            const float expected = e.strength * dt;
+            int drops = static_cast<int>(expected);
+            drops += Random() < expected - static_cast<float>(drops) ? 1 : 0;
+            drops = drops > kMostDrops ? kMostDrops : drops;
+            // Falloff is the drops' size for an impact (1 by default: a raindrop's).
+            const float size = e.falloff > 0.0f ? e.falloff : 1.0f;
+
+            for (int d = 0; d < drops; d++) {
+                const float angle = Random() * 6.2831853f, r = std::sqrt(Random()) * e.radius;
+                const float s = size * (0.7f + 0.6f * Random());
+
+                if (!water->ripple(e.pos[0] + std::cos(angle) * r, e.pos[1] + std::sin(angle) * r, kDropRadius * s, kDropDepth * s)) {
+                    return;   // the field is off or full
+                }
+            }
         }
     }
 
