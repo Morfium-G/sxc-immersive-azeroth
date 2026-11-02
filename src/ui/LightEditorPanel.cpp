@@ -30,6 +30,7 @@ namespace ia::ui {
     namespace {
         const ImVec4 kOurs(0.45f, 1.0f, 0.45f, 1.0f);    // has our light (an assignment row)
         const ImVec4 kStock(1.0f, 0.8f, 0.35f, 1.0f);    // only its own lights
+        const ImVec4 kGlow(0.8f, 0.55f, 1.0f, 1.0f);     // only our glow (rows with a glow, no light or emitter)
         const ImVec4 kMissing(1.0f, 0.35f, 0.3f, 1.0f);  // a row whose attachment the model lacks
 
         float g_range = 25.0f;
@@ -130,6 +131,7 @@ namespace ia::ui {
             sxc::data::Table lights = sxc::data::Table::Get("DoodadLightProperties");
             sxc::data::Table emitters = sxc::data::Table::Get("DoodadEmitterProperties");
             sxc::data::Table rows = sxc::data::Table::Get("DoodadSourceAssignment");
+            sxc::data::Table glows = sxc::data::Table::Get("DoodadGlowProperties");
         };
 
         Tables& T() {
@@ -145,6 +147,10 @@ namespace ia::ui {
 
             if (!t.rows) {
                 t.rows = sxc::data::Table::Get("DoodadSourceAssignment");
+            }
+
+            if (!t.glows) {
+                t.glows = sxc::data::Table::Get("DoodadGlowProperties");
             }
 
             return t;
@@ -189,6 +195,97 @@ namespace ia::ui {
 
             const sxc::data::Row r = T().emitters ? T().emitters.Find(id) : sxc::data::Row();
             return r ? std::to_string(id) + " " + std::string(r.String(T().emitters.Field("Name"))) : std::to_string(id) + " (missing)";
+        }
+
+        std::string GlowName(uint32_t id) {
+            if (!id) {
+                return "no glow";
+            }
+
+            const sxc::data::Row r = T().glows ? T().glows.Find(id) : sxc::data::Row();
+            return r ? std::to_string(id) + " " + std::string(r.String(T().glows.Field("Name"))) : std::to_string(id) + " (missing)";
+        }
+
+        // A texture's name as the rows compare it: lower case, backslashes, no extension.
+        std::string TextureKey(const char* path) {
+            std::string s = Normalize(path);
+            const size_t dot = s.rfind('.');
+            return dot != std::string::npos && s.find('\\', dot) == std::string::npos ? s.substr(0, dot) : s;
+        }
+
+        // A glow row for a texture: the whole texture, white, once more.
+        uint32_t AddGlow(const sxc_data_api* api, const char* texture) {
+            sxc::data::Table& g = T().glows;
+            const int32_t index = g ? api->add_row(g.Handle()) : -1;
+
+            if (index < 0) {
+                return 0;
+            }
+
+            const sxc::data::Row r = g.At(static_cast<uint32_t>(index));
+            const std::string name = TextureKey(texture);
+            const size_t slash = name.rfind('\\');
+            r.SetString(g.Field("Name"), 0, (slash == std::string::npos ? name : name.substr(slash + 1)).c_str());
+            r.SetString(g.Field("Texture"), 0, texture);
+            r.SetRaw(g.Field("Mode"), 0, 1);
+            r.SetRaw(g.Field("Color"), 0, 0xFFFFFF);
+            r.SetFloat(g.Field("Strength"), 0, 1.0f);
+            return r.Id();
+        }
+
+        // The selected model's textures, with what the focused row can do with each: wait for it (the
+        // texture condition) or make it glow.
+        void EditTextures(const sxc_data_api* api, const sxc_lights_api* lights, const Model& m, const float pos[3]) {
+            if (lights->struct_size < offsetof(sxc_lights_api, model_textures) + sizeof(lights->model_textures)) {
+                return;
+            }
+
+            static sxc_lights_texture textures[64];
+            const uint32_t n = lights->model_textures(m.path.c_str(), pos, textures, 64);
+            char label[64];
+            std::snprintf(label, sizeof label, "Textures (%u)###textures", n);
+
+            if (!ImGui::TreeNode(label)) {
+                return;
+            }
+
+            sxc::data::Table& t = T().rows;
+            const sxc::data::Row focus = g_focusRow ? t.Find(g_focusRow) : sxc::data::Row();
+            const int fCondition = t.Field("TextureCondition"), fGlow = t.Field("GlowID");
+            ImGui::TextDisabled(focus ? "For row %u (the open one):" : "Open a row above to use a texture for it.", g_focusRow);
+
+            for (uint32_t i = 0; i < n; i++) {
+                ImGui::PushID(static_cast<int>(i));
+                const char* path = textures[i].path && textures[i].path[0] ? textures[i].path : "(none)";
+
+                if (focus && fCondition >= 0 && textures[i].path && textures[i].path[0]) {
+                    if (ImGui::SmallButton("Condition")) {
+                        focus.SetString(fCondition, 0, textures[i].path);
+                    }
+
+                    ImGui::SetItemTooltip("The row acts only on models wearing this texture.");
+                    ImGui::SameLine();
+
+                    if (ImGui::SmallButton("Glow")) {
+                        const uint32_t glow = fGlow >= 0 ? focus.Uint(fGlow) : 0;
+                        const sxc::data::Row g = glow && T().glows ? T().glows.Find(glow) : sxc::data::Row();
+
+                        if (g) {
+                            g.SetString(T().glows.Field("Texture"), 0, textures[i].path);
+                        } else if (fGlow >= 0) {
+                            focus.SetRaw(fGlow, 0, AddGlow(api, textures[i].path));
+                        }
+                    }
+
+                    ImGui::SetItemTooltip("This texture glows: the row's glow takes it, or a new glow (white, the whole texture) is made for it.");
+                    ImGui::SameLine();
+                }
+
+                ImGui::Text("%u: %s%s", i, path, textures[i].replaceable ? "  (replaceable)" : "");
+                ImGui::PopID();
+            }
+
+            ImGui::TreePop();
         }
 
         // One table's line: its state, undo / redo, save, reload.
@@ -377,10 +474,20 @@ namespace ia::ui {
                 const uint32_t type = r.Uint(fType);
                 const bool lacks = missing.count(id) != 0;
                 const uint32_t lightId = r.Uint(fLight), emitterId = fEmitter >= 0 ? r.Uint(fEmitter) : 0;
-                // What the row places: its light, its emitter, or both.
-                const std::string what = lightId && emitterId ? LightName(lightId) + " + " + EmitterName(emitterId)
-                                         : emitterId           ? EmitterName(emitterId)
-                                                               : LightName(lightId);
+                const int fGlow = t.Field("GlowID"), fCondition = t.Field("TextureCondition");
+                const uint32_t glowId = fGlow >= 0 ? r.Uint(fGlow) : 0;
+                // What the row places: its light, its emitter, or both; its glow; the texture it waits for.
+                std::string what = lightId && emitterId ? LightName(lightId) + " + " + EmitterName(emitterId)
+                                   : emitterId           ? EmitterName(emitterId)
+                                   : lightId || !glowId  ? LightName(lightId)
+                                                         : std::string();
+                if (glowId) {
+                    what += (what.empty() ? "glow " : " + glow ") + std::to_string(glowId);
+                }
+
+                if (fCondition >= 0 && !r.String(fCondition).empty()) {
+                    what += " (wearing " + std::string(r.String(fCondition)) + ")";
+                }
                 char header[360];
                 const uint32_t flags = r.Uint(fFlags);
                 std::snprintf(header, sizeof header, "Row %u: %s at %s %d%s%s%s%s%s###row", id, what.c_str(), type < 4 ? kAttachTypes[type] : "?", r.Int(fIndex),
@@ -490,6 +597,42 @@ namespace ia::ui {
                     }
 
                     ImGui::SetItemTooltip("Heat or cold, moisture or a draft placed with the row (DoodadEmitterProperties); a draft blows along the row's Direction.");
+                }
+
+                const int fGlowId = t.Field("GlowID"), fTexCondition = t.Field("TextureCondition");
+
+                if (fGlowId >= 0 && T().glows) {
+                    const uint32_t glow = r.Uint(fGlowId);
+                    ImGui::SetNextItemWidth(220.0f);
+
+                    if (ImGui::BeginCombo("Glow", GlowName(glow).c_str())) {
+                        if (ImGui::Selectable("no glow", glow == 0)) {
+                            r.SetRaw(fGlowId, 0, 0);
+                        }
+
+                        const sxc::data::Table& gt = T().glows;
+
+                        for (uint32_t i = 0; i < gt.RowCount(); i++) {
+                            const uint32_t gid = gt.At(i).Id();
+
+                            if (ImGui::Selectable(GlowName(gid).c_str(), gid == glow)) {
+                                r.SetRaw(fGlowId, 0, gid);
+                            }
+                        }
+
+                        ImGui::EndCombo();
+                    }
+
+                    ImGui::SetItemTooltip("One of the model's textures drawn glowing (DoodadGlowProperties); the Textures list below picks it.");
+                }
+
+                if (fTexCondition >= 0 && !r.String(fTexCondition).empty()) {
+                    ImGui::TextDisabled("only when wearing %s", std::string(r.String(fTexCondition)).c_str());
+                    ImGui::SameLine();
+
+                    if (ImGui::SmallButton("Any model")) {
+                        r.SetString(fTexCondition, 0, "");
+                    }
                 }
 
                 DirectionControls(m, r, type, r.Int(fIndex), points);
@@ -662,7 +805,7 @@ namespace ia::ui {
                 char amount[32];
                 std::snprintf(amount, sizeof amount, type == 0 ? "%.0f degC" : "%.2f", strength);
                 char header[200];
-                std::snprintf(header, sizeof header, "%u %s (%s %s, %s)###emitter", id, name.c_str(), type >= 0 && type < 3 ? kEmitterTypes[type] : "?", amount,
+                std::snprintf(header, sizeof header, "%u %s (%s %s, %s)###emitter", id, name.c_str(), type >= 0 && type < 4 ? kEmitterTypes[type] : "?", amount,
                               radius > 0.0f ? (std::to_string(static_cast<int>(radius + 0.5f)) + " yd").c_str() : "default radius");
 
                 if (ImGui::CollapsingHeader(header)) {
@@ -703,6 +846,43 @@ namespace ia::ui {
             const emitters::Stats st = emitters::GetStats();
             ImGui::TextDisabled("%s; placed now: %u (temperature %u, moisture %u, drafts %u)%s", emitters::TableStatus(), st.placed, st.temperature, st.moisture,
                                 st.draft, st.unknown ? "; some rows name an emitter that doesn't exist" : "");
+        }
+
+        // The glows: each row's form.
+        void EditGlows(const sxc_data_api* api) {
+            sxc::data::Table& t = T().glows;
+            const int fName = t.Field("Name"), fTexture = t.Field("Texture");
+
+            for (uint32_t i = 0; i < t.RowCount(); i++) {
+                const sxc::data::Row r = t.At(i);
+                const uint32_t id = r.Id();
+                ImGui::PushID(static_cast<int>(id));
+                char header[300];
+                std::snprintf(header, sizeof header, "%u %s (%s)###glow", id, std::string(r.String(fName)).c_str(),
+                              r.String(fTexture).empty() ? "every texture" : std::string(r.String(fTexture)).c_str());
+
+                if (ImGui::CollapsingHeader(header)) {
+                    if (ImGui::SmallButton("Clone")) {
+                        api->clone_row(t.Handle(), i);
+                    }
+
+                    ImGui::SameLine();
+
+                    if (ImGui::SmallButton("Delete")) {
+                        api->remove_row(t.Handle(), i);
+                        ImGui::PopID();
+                        break;
+                    }
+
+                    api->draw_row_form(t.Handle(), i);
+                }
+
+                ImGui::PopID();
+            }
+
+            if (ImGui::Button("Add a glow")) {
+                AddGlow(api, "");
+            }
         }
 
         // --- markers in the world ------------------------------------------------------------------
@@ -917,6 +1097,10 @@ namespace ia::ui {
 
         TableLine(dataApi, "DoodadSourceAssignment", T().rows);
 
+        if (T().glows) {
+            TableLine(dataApi, "DoodadGlowProperties", T().glows);
+        }
+
         if (g_message[0]) {
             ImGui::TextDisabled("%s", g_message);
         }
@@ -965,6 +1149,8 @@ namespace ia::ui {
 
         ImGui::TextColored(kOurs, "green: has our light or emitter");
         ImGui::SameLine();
+        ImGui::TextColored(kGlow, " violet: only our glow");
+        ImGui::SameLine();
         ImGui::TextColored(kStock, " amber: only its own");
         ImGui::SameLine();
         ImGui::TextColored(kMissing, " red: a row's attachment is missing");
@@ -982,23 +1168,24 @@ namespace ia::ui {
                 }
 
                 shown++;
-                bool ours = false, lacks = false;
+                bool ours = false, glows = false, lacks = false;
 
-                const int fEmitter = T().rows.Field("EmitterID");
+                const int fEmitter = T().rows.Field("EmitterID"), fGlow = T().rows.Field("GlowID");
 
                 for (uint32_t id : RowsOf(m.key)) {
                     const sxc::data::Row r = T().rows.Find(id);
                     ours = ours || (r && (r.Uint(T().rows.Field("LightID")) != 0 || (fEmitter >= 0 && r.Uint(fEmitter) != 0)));
+                    glows = glows || (r && fGlow >= 0 && r.Uint(fGlow) != 0);
                     lacks = lacks || missing.count(id) != 0;
                 }
 
                 char line[400];
                 std::snprintf(line, sizeof line, "%5.1f yd  %s%s%s  (%u placed; A %u, E %u, L %u, B %u)", m.distance, m.path.c_str(), m.parent.empty() ? "" : "  on ",
                               m.parent.c_str(), m.placed, m.attachments, m.emitters, m.ownLights, m.bones);
-                const bool colour = lacks || ours || m.ownLights > 0;
+                const bool colour = lacks || ours || glows || m.ownLights > 0;
 
                 if (colour) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, lacks ? kMissing : (ours ? kOurs : kStock));
+                    ImGui::PushStyleColor(ImGuiCol_Text, lacks ? kMissing : ours ? kOurs : glows ? kGlow : kStock);
                 }
 
                 if (ImGui::Selectable(line, m.key == g_selected)) {
@@ -1054,6 +1241,7 @@ namespace ia::ui {
 
             ImGui::Text("A %u, E %u, L %u, B %u", selected->attachments, selected->emitters, selected->ownLights, selected->bones);
             EditRows(dataApi, *selected, found, missing);
+            EditTextures(dataApi, lightsApi, *selected, s.playerPos);
         }
 
         ImGui::SeparatorText("Lights (DoodadLightProperties)");
@@ -1061,5 +1249,10 @@ namespace ia::ui {
 
         ImGui::SeparatorText("Emitters (DoodadEmitterProperties)");
         EditEmitters(dataApi);
+
+        if (T().glows) {
+            ImGui::SeparatorText("Glows (DoodadGlowProperties)");
+            EditGlows(dataApi);
+        }
     }
 }

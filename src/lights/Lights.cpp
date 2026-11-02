@@ -15,6 +15,7 @@ namespace ia::lights {
 
         TableWatch g_properties("DoodadLightProperties");
         TableWatch g_assignments("DoodadSourceAssignment");
+        TableWatch g_glowTable("DoodadGlowProperties");
         std::string g_tableStatus = "not loaded yet";
         bool g_tableSent = false;
 
@@ -23,7 +24,7 @@ namespace ia::lights {
         void SendTable(const sxc_lights_api* api) {
             std::vector<sxc_lights_kind> kinds;
             std::vector<sxc_lights_assignment> rows;
-            std::vector<std::string> paths;
+            std::vector<std::string> paths, conditions;
             const sxc::data::Table& p = g_properties.Table();
             const sxc::data::Table& a = g_assignments.Table();
 
@@ -58,8 +59,9 @@ namespace ia::lights {
             if (a) {
                 const int path = a.Field("ModelPath"), type = a.Field("AttachType"), index = a.Field("AttachIndex"), offset = a.Field("Offset"),
                           direction = a.Field("Direction"), light = a.Field("LightID"), flags = a.Field("Flags"),
-                          emitter = a.Field("EmitterID");
+                          emitter = a.Field("EmitterID"), condition = a.Field("TextureCondition"), glow = a.Field("GlowID");
                 paths.reserve(a.RowCount());
+                conditions.reserve(a.RowCount());
 
                 for (uint32_t i = 0; i < a.RowCount(); i++) {
                     const sxc::data::Row r = a.At(i);
@@ -77,11 +79,14 @@ namespace ia::lights {
                     row.flags = r.Uint(flags);
                     row.id = r.Id();
                     row.emitter_id = emitter >= 0 ? r.Uint(emitter) : 0;
+                    row.glow_id = glow >= 0 ? r.Uint(glow) : 0;
+                    conditions.emplace_back(condition >= 0 ? r.String(condition) : "");
                     rows.push_back(row);
                 }
 
                 for (size_t i = 0; i < rows.size(); i++) {
                     rows[i].model_path = paths[i].c_str();
+                    rows[i].texture_condition = conditions[i].c_str();
                 }
             }
 
@@ -91,6 +96,49 @@ namespace ia::lights {
             std::snprintf(line, sizeof(line), "%u light(s) in DoodadLightProperties%s, %u assignment(s) in DoodadSourceAssignment%s", static_cast<unsigned>(kinds.size()),
                           p.Loaded() ? "" : " (no file)", static_cast<unsigned>(rows.size()), a.Loaded() ? "" : " (no file)");
             g_tableStatus = line;
+        }
+
+        // DoodadGlowProperties to the client.
+        void SendGlows(const sxc_lights_api* api) {
+            if (api->struct_size < offsetof(sxc_lights_api, set_glows) + sizeof(api->set_glows)) {
+                return;
+            }
+
+            std::vector<sxc_lights_glow> glows;
+            std::vector<std::string> textures;
+            const sxc::data::Table& t = g_glowTable.Table();
+
+            if (t) {
+                const int texture = t.Field("Texture"), mode = t.Field("Mode"), threshold = t.Field("Threshold"), knee = t.Field("Knee"),
+                          color = t.Field("Color"), strength = t.Field("Strength"), speed = t.Field("PulseSpeed"), amount = t.Field("PulseAmount"),
+                          flags = t.Field("Flags");
+                textures.reserve(t.RowCount());
+
+                for (uint32_t i = 0; i < t.RowCount(); i++) {
+                    const sxc::data::Row r = t.At(i);
+                    sxc_lights_glow g = {};
+                    g.id = r.Id();
+                    g.mode = r.Uint(mode) ? r.Uint(mode) : SXC_LIGHTS_GLOW_WHOLE;
+                    g.threshold = r.Float(threshold);
+                    g.knee = r.Float(knee);
+                    const uint32_t c = r.Uint(color);
+                    g.color[0] = ((c >> 16) & 0xFF) / 255.0f;
+                    g.color[1] = ((c >> 8) & 0xFF) / 255.0f;
+                    g.color[2] = (c & 0xFF) / 255.0f;
+                    g.strength = r.Float(strength);
+                    g.pulse_speed = r.Float(speed);
+                    g.pulse_amount = r.Float(amount);
+                    g.flags = r.Uint(flags);
+                    textures.emplace_back(r.String(texture));
+                    glows.push_back(g);
+                }
+
+                for (size_t i = 0; i < glows.size(); i++) {
+                    glows[i].texture = textures[i].c_str();
+                }
+            }
+
+            api->set_glows(glows.empty() ? nullptr : glows.data(), static_cast<uint32_t>(glows.size()));
         }
 
         const sxc_lights_api* Api() {
@@ -129,10 +177,17 @@ namespace ia::lights {
             // Both asked every frame (a change to either sends both).
             const bool changed = g_properties.Changed() | g_assignments.Changed();
 
+            const bool glowsChanged = g_glowTable.Changed();
+
             if (changed || !g_tableSent) {
                 SendTable(api);
-                g_tableSent = true;
             }
+
+            if (glowsChanged || !g_tableSent) {
+                SendGlows(api);
+            }
+
+            g_tableSent = true;
 
             Send(api, g_settings.enabled);
             g_running = true;

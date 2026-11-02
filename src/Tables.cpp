@@ -194,6 +194,29 @@ namespace {
                      "they meet, the nearer with both; nothing is placed where there is none (a drip's mark on the floor, bubbles at the surface). "
                      "Under water: the light and emitter are placed only above, or only below, a water surface.");
         s.ForeignKey("EmitterID", "DoodadEmitterProperties").Value(0, "no emitter");
+        s.Path("TextureCondition").Tooltip("Only on models wearing this texture (a creature's skin from its display counts; case, / vs \\ and .blp don't "
+                                           "matter). Empty: every model of the file. Two rows with different textures tell apart models sharing a file "
+                                           "(a fire and a fel elemental). For the row's light, emitter and glow.");
+        s.ForeignKey("GlowID", "DoodadGlowProperties").Value(0, "no glow");
+        return s;
+    }
+
+    Schema DoodadGlowProperties() {
+        Schema s("DoodadGlowProperties", "DBFilesClient\\DoodadGlowProperties.cdbc");
+        s.Description("A model's texture drawn glowing (DoodadSourceAssignment's GlowID): brighter, lighting nothing, like WMO windows; place a light "
+                      "beside it for the light it gives. Vulkan only.");
+        s.Id();
+        s.String("Name");
+        s.Path("Texture").Tooltip("The texture that glows (it may differ from the row's TextureCondition). Empty: every texture of the model.");
+        s.Enum("Mode").Default(1).Value(1, "whole texture").Value(2, "by its alpha").Value(3, "brighter than the threshold")
+            .Tooltip("Which pixels glow: all, by the texture's alpha (a mask in it), or those brighter than Threshold.");
+        s.Float("Threshold").Range(0, 1).Tooltip("Brighter than the threshold: from this brightness (its brightest channel, 0..1).");
+        s.Float("Knee").Range(0, 1).Tooltip("Brighter than the threshold: how much brighter it glows fully. 0: 0.1.");
+        s.Color("Color").Tooltip("x the texture's own colour (white: the texture itself glows).");
+        s.Float("Strength").Tooltip("x the colour; 1 adds the texture once more.");
+        s.Float("PulseSpeed").Group("Pulse").Tooltip("Pulses a second; 0 steady.");
+        s.Float("PulseAmount").Range(0, 1).Group("Pulse").Tooltip("How far a pulse dims it, 0..1.");
+        s.Flags("Flags").Tooltip("Reserved, 0.");
         return s;
     }
 
@@ -371,7 +394,7 @@ namespace {
 namespace ia {
     void RegisterTables() {
         Schema (*const schemas[])() = {
-            AreaClimate, DoodadEmitterProperties, DoodadLightProperties, DoodadSourceAssignment, FogSettings, GroundEffectDoodadDensity, GroundEffectDoodadWind,
+            AreaClimate, DoodadEmitterProperties, DoodadGlowProperties, DoodadLightProperties, DoodadSourceAssignment, FogSettings, GroundEffectDoodadDensity, GroundEffectDoodadWind,
             GroundMaterial, GroundMaterialSelector, SkyBody, SkyBodySet, SkyBodySetMember, SkyPath, SkyPathKey, SkyProfile, SkyTime,
             SurfaceCover, WindProfile,
         };
