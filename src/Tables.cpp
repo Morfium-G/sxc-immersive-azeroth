@@ -365,6 +365,37 @@ namespace {
         return s;
     }
 
+    Schema RiverPath() {
+        Schema s("RiverPath", "DBFilesClient\\RiverPath.cdbc");
+        s.Description("A river (kb: rivers): its nodes (RiverNode) in order, upstream first, and what they don't set themselves. "
+                      "Our water follows its flow (Vulkan; terrain water).");
+        s.Id();
+        s.String("Name");
+        s.Int("MapID").Tooltip("Map.dbc ID: the map the river is on.");
+        s.Float("Width").Default(10).Tooltip("yd bank to bank, where a node doesn't set its own.");
+        s.Float("Speed").Default(1.5f).Tooltip("yd / s, where a node doesn't set its own (a walk is ~2.5).");
+        s.ForeignKey("JoinsPathID", "RiverPath").Value(0, "none").Group("Joins").Tooltip("The river its last node flows into (reserved: not read yet).");
+        s.ForeignKey("BranchesFromID", "RiverPath").Value(0, "none").Group("Joins").Tooltip("The river its first node leaves (reserved: not read yet).");
+        s.Flags("Flags").Tooltip("Reserved, 0.");
+        Comment(s);
+        return s;
+    }
+
+    Schema RiverNode() {
+        Schema s("RiverNode", "DBFilesClient\\RiverNode.cdbc");
+        s.Description("A river's nodes: where it runs, how wide and fast it is there, and what the stretch after the node does.");
+        s.Id();
+        s.ForeignKey("PathID", "RiverPath");
+        s.Int("Order").Tooltip("Along the river, upstream first (the editor numbers them 10, 20, 30 ...).");
+        s.Vector("Position").Tooltip("World yd; only x and y shape the flow.");
+        s.Float("Width").Value(0, "the river's").Tooltip("yd bank to bank here.");
+        s.Float("Speed").Value(0, "the river's").Tooltip("yd / s here.");
+        s.Enum("Kind").Value(0, "calm").Value(1, "rapids").Value(2, "falls").Tooltip("What the stretch after this node does (rapids and falls: rough).");
+        s.Flags("Flags").Tooltip("Reserved, 0.");
+        Comment(s);
+        return s;
+    }
+
     Schema FogSettings() {
         Schema s("FogSettings", "DBFilesClient\\FogSettings.cdbc");
         s.Description("How the ground fog behaves and looks, per place and fog kind. All floats: -1 takes the field from the next row.");
@@ -395,7 +426,7 @@ namespace ia {
     void RegisterTables() {
         Schema (*const schemas[])() = {
             AreaClimate, DoodadEmitterProperties, DoodadGlowProperties, DoodadLightProperties, DoodadSourceAssignment, FogSettings, GroundEffectDoodadDensity, GroundEffectDoodadWind,
-            GroundMaterial, GroundMaterialSelector, SkyBody, SkyBodySet, SkyBodySetMember, SkyPath, SkyPathKey, SkyProfile, SkyTime,
+            GroundMaterial, GroundMaterialSelector, RiverNode, RiverPath, SkyBody, SkyBodySet, SkyBodySetMember, SkyPath, SkyPathKey, SkyProfile, SkyTime,
             SurfaceCover, WindProfile,
         };
 

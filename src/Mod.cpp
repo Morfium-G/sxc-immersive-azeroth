@@ -38,6 +38,7 @@
 #include "sky/Ephemeris.h"
 #include "sky/SkyApi.h"
 #include "ui/Panels.h"
+#include "water/Rivers.h"
 #include "wxl/sdk.hpp"
 
 namespace ia {
@@ -150,6 +151,7 @@ namespace {
             sxc::ui::AddPanel(module, "Lights", ia::ui::DrawLights);
             sxc::ui::AddPanel(module, "Light editor", ia::ui::DrawLightEditor);
             sxc::ui::AddPanel(module, "Grass", ia::ui::DrawGrass);
+            sxc::ui::AddPanel(module, "Rivers", ia::ui::DrawRivers);
 
             char line[160];
             std::snprintf(line, sizeof(line), "ready: tables registered, sky provider %s, overlay module %s", ia::sky::Api() ? "set" : "unavailable",
@@ -220,6 +222,7 @@ namespace {
             { prof::Scope p(prof::kFogDraw); ia::fog::Draw(dt, snap); }
             { prof::Scope p(prof::kCover); ia::cover::Update(snap); }
             { prof::Scope p(prof::kLights); ia::lights::Update(snap); }
+            ia::rivers::Update(snap);
         }
 
         struct OnUpdate {
