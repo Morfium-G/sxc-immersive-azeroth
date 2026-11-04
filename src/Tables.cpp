@@ -374,8 +374,8 @@ namespace {
         s.Int("MapID").Tooltip("Map.dbc ID: the map the river is on.");
         s.Float("Width").Default(10).Tooltip("yd bank to bank, where a node doesn't set its own.");
         s.Float("Speed").Default(1.5f).Tooltip("yd / s, where a node doesn't set its own (a walk is ~2.5).");
-        s.ForeignKey("JoinsPathID", "RiverPath").Value(0, "none").Group("Joins").Tooltip("The river its last node flows into (reserved: not read yet).");
-        s.ForeignKey("BranchesFromID", "RiverPath").Value(0, "none").Group("Joins").Tooltip("The river its first node leaves (reserved: not read yet).");
+        s.ForeignKey("JoinsPathID", "RiverPath").Value(0, "none").Group("Joins").Tooltip("The river its last node flows into (the editor keeps that node on it).");
+        s.ForeignKey("BranchesFromID", "RiverPath").Value(0, "none").Group("Joins").Tooltip("The river its first node leaves (the editor keeps that node on it).");
         s.Flags("Flags").Tooltip("Reserved, 0.");
         Comment(s);
         return s;

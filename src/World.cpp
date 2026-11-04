@@ -113,6 +113,28 @@ namespace ia::world {
         return true;
     }
 
+    bool Unproject(float x, float y, float width, float height, float origin[3], float direction[3]) {
+        const sxc_world_api* api = Api();
+
+        if (!api || api->struct_size < offsetof(sxc_world_api, unproject) + sizeof(api->unproject) || width <= 0.0f || height <= 0.0f) {
+            return false;
+        }
+
+        wxl_vec3 o{}, d{};
+
+        if (!api->unproject(x / width, y / height, &o, &d)) {
+            return false;
+        }
+
+        origin[0] = o.x;
+        origin[1] = o.y;
+        origin[2] = o.z;
+        direction[0] = d.x;
+        direction[1] = d.y;
+        direction[2] = d.z;
+        return true;
+    }
+
     bool SetClientWeather(int type, float intensity) {
         const sxc_world_api* api = ViewApi();
 

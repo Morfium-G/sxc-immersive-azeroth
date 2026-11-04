@@ -53,6 +53,10 @@ namespace ia::world {
     // Where a world point is on the window, in pixels of `width` x `height`. False behind the camera.
     bool Project(const float pos[3], float width, float height, float& x, float& y);
 
+    // The way back: the ray from the camera through pixel (x, y) of a `width` x `height` window, its
+    // origin and unit direction. False on an older client or before the world is up.
+    bool Unproject(float x, float y, float width, float height, float origin[3], float direction[3]);
+
     // A test weather the client shows (rain falls, snow drifts) as if the server sent it: type 0 fine,
     // 1 rain, 2 snow, 3 sand, intensity 0..1; type < 0 gives the server's weather back. The snapshot
     // and everything after it follow. False when the client can't (an older one).
