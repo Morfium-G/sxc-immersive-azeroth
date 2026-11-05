@@ -18,6 +18,7 @@ namespace ia::ui {
         lights::Stats(st);
         const char* off = s.enabled ? "" : " (off)";
         ImGui::Text("Tables: %s", lights::TableStatus());
+        ImGui::Text("Models walked: %u%s", st.models, off);
         ImGui::Text("Table lights: %u%s", st.table_lights, off);
 
         if (st.attach_missing) {
