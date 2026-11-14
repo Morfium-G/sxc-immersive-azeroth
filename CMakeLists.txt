@@ -22,7 +22,7 @@ wxl_add_mod(immersive-azeroth
         src/lights/Lights.cpp
         src/water/Rivers.cpp
         src/sky/Clock.cpp src/sky/SkyTime.cpp src/sky/BodyTables.cpp src/sky/Paths.cpp src/sky/Ephemeris.cpp src/sky/Bodies.cpp
-        src/ui/SkyPanel.cpp src/ui/ClimatePanel.cpp src/ui/WindPanel.cpp src/ui/GroundPanel.cpp src/ui/FogPanel.cpp src/ui/CoverPanel.cpp src/ui/LightsPanel.cpp src/ui/LightEditorPanel.cpp src/ui/GrassPanel.cpp src/ui/RiversPanel.cpp src/grass/Grass.cpp
+        src/ui/SkyPanel.cpp src/ui/ClimatePanel.cpp src/ui/WindPanel.cpp src/ui/GroundPanel.cpp src/ui/FogPanel.cpp src/ui/CoverPanel.cpp src/ui/LightsPanel.cpp src/ui/LightEditorPanel.cpp src/ui/GrassPanel.cpp src/ui/GrassEditorPanel.cpp src/ui/RiversPanel.cpp src/grass/Grass.cpp
     MANIFEST mod.json
     TARGETS win-x64)
 

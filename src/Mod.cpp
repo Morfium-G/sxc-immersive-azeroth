@@ -151,6 +151,7 @@ namespace {
             sxc::ui::AddPanel(module, "Lights", ia::ui::DrawLights);
             sxc::ui::AddPanel(module, "Light editor", ia::ui::DrawLightEditor);
             sxc::ui::AddPanel(module, "Grass", ia::ui::DrawGrass);
+            sxc::ui::AddPanel(module, "Grass editor", ia::ui::DrawGrassEditor);
             sxc::ui::AddPanel(module, "Rivers", ia::ui::DrawRivers);
 
             char line[160];
