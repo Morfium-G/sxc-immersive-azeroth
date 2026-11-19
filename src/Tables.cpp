@@ -69,7 +69,7 @@ namespace {
         s.Uint("DoodadID").Value(0, "every doodad").Tooltip("GroundEffectDoodad.dbc ID.");
         s.Uint("GroundEffectID").Value(0, "any").Tooltip("GroundEffectTexture.dbc ID (what the map designer painted).");
         Inherit(s.Float("Multiplier")).Tooltip("Plants drawn per placed plant (1 = no copies).");
-        Inherit(s.Float("Radius")).Tooltip("Yards around the player; full density within half of it.");
+        Inherit(s.Float("Radius")).Tooltip("Yards around the player; full density within half of it. 1024 when no row gives one.");
         Inherit(s.Float("Spread")).Tooltip("Most yards a copy moves from its plant.");
         return s;
     }

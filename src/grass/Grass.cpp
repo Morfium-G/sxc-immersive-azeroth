@@ -267,8 +267,9 @@ namespace ia::grass {
                     }
                 }
 
-                // WXL's values where no row gave one: no copies, no radius, 1 yd of spread.
-                const sxc_grass_density v = { value[0] >= 0.0f ? value[0] : 1.0f, value[1] >= 0.0f ? value[1] : 0.0f, value[2] >= 0.0f ? value[2] : 1.0f };
+                // Where no row gave a value: no copies, 1024 yd (the player's limit caps it), 1 yd of spread. Not WXL's
+                // radius of 0: a multiplier did nothing without a global row giving the radius.
+                const sxc_grass_density v = { value[0] >= 0.0f ? value[0] : 1.0f, value[1] >= 0.0f ? value[1] : 1024.0f, value[2] >= 0.0f ? value[2] : 1.0f };
 
                 if (g_densityCache.size() > 20000) {
                     g_densityCache.clear();
